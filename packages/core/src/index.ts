@@ -14,3 +14,4 @@ export * from './provider-factory.js';
 export * from './agent-definition.js';
 export * from './db/index.js';
 export * from './time.js';
+export * from './tracing.js';

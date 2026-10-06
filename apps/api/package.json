@@ -22,6 +22,8 @@
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",
     "@nestjs/platform-express": "^12.1.2",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/sdk-node": "^0.222.0",
     "ioredis": "^6.0.0",
     "pg": "^8.23.1",
     "prom-client": "^15.1.3",

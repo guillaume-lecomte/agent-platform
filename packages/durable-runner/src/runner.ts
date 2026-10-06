@@ -4,6 +4,7 @@ import {
   estimateInputTokens,
   sha256,
   validateJsonSchema,
+  withSpan,
   type AgentDefinition,
   type AnyTool,
   type LLMProvider,
@@ -220,15 +221,21 @@ export class AgentRunner {
 
       let response;
       try {
-        response = await retryTransient(() => provider.complete(request), {
-          ...this.deps.retry,
-          signal,
-          onRetry: ({ attempt, delayMs, error }) => {
-            log.warn({ attempt, delayMs, kind: error.kind }, 'transient LLM error, retrying');
-            this.deps.hooks?.onLlmRetry?.({ taskId, attempt, delayMs, kind: error.kind });
-            void this.emit('task.retry', taskId, { attempt, delayMs, kind: error.kind });
+        response = await retryTransient(
+          () =>
+            withSpan('llm.complete', { 'task.id': taskId, 'agent.id': task.agentId }, () =>
+              provider.complete(request),
+            ),
+          {
+            ...this.deps.retry,
+            signal,
+            onRetry: ({ attempt, delayMs, error }) => {
+              log.warn({ attempt, delayMs, kind: error.kind }, 'transient LLM error, retrying');
+              this.deps.hooks?.onLlmRetry?.({ taskId, attempt, delayMs, kind: error.kind });
+              void this.emit('task.retry', taskId, { attempt, delayMs, kind: error.kind });
+            },
           },
-        });
+        );
       } catch (err) {
         if (err instanceof LLMError) {
           const fresh = await store.getTask(taskId);
@@ -383,12 +390,17 @@ export class AgentRunner {
     let content: string;
     let isError = false;
     try {
-      const output = await tool.execute(call.arguments, {
-        taskId: task.id,
-        idempotencyKey: `${key.taskId}:${key.stepSeq}:${key.argsHash}`,
-        signal,
-        logger: log,
-      });
+      const output = await withSpan(
+        'tool.execute',
+        { 'task.id': task.id, 'tool.name': tool.name, 'tool.risk': tool.risk },
+        () =>
+          tool.execute(call.arguments, {
+            taskId: task.id,
+            idempotencyKey: `${key.taskId}:${key.stepSeq}:${key.argsHash}`,
+            signal,
+            logger: log,
+          }),
+      );
       content = typeof output === 'string' ? output : JSON.stringify(output);
     } catch (err) {
       isError = true;
