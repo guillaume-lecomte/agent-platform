@@ -1,0 +1,12 @@
+{
+  "active": "v1",
+  "history": [
+    {
+      "action": "initial",
+      "version": "v1",
+      "previous": null,
+      "at": "2026-10-06T00:00:00.000Z",
+      "note": "Initial version"
+    }
+  ]
+}

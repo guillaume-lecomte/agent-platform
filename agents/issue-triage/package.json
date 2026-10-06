@@ -1,0 +1,39 @@
+{
+  "name": "@agent-platform/agent-issue-triage",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Demo agent: classifies GitHub issues, estimates priority, proposes labels and drafts a reply.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "data",
+    "v*.yaml",
+    "active.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent-platform/core": "workspace:*",
+    "pg": "^8.23.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.15.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

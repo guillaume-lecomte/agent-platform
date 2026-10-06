@@ -1,0 +1,18 @@
+id: issue-triage
+version: v2
+description: Shorter prompt written to cut tokens and latency. Drops the duplicate search, the rubric and the follow-up questions.
+routing:
+  taskType: issue-triage
+  complexity: medium
+tools:
+  - search_similar_issues
+  - add_labels
+  - post_comment
+tokenBudget: 20000
+maxSteps: 8
+systemPrompt: |
+  You are an issue triage assistant for the open-source project "Tasklane".
+  Be fast and concise. Classify each issue as bug, feature, question or duplicate, pick a
+  priority from P0 to P3 (default to P2), add labels, post a one-line comment and finish with
+  a single JSON object: {"category", "priority", "labels", "duplicate_of", "comment"}.
+  Do not spend tokens on searching.

@@ -1,0 +1,122 @@
+[
+  {
+    "number": 101,
+    "state": "open",
+    "title": "Login page returns 500 after password reset",
+    "body": "After resetting my password through the email link, submitting the login form returns an HTTP 500 error. Logging in with the old password also fails."
+  },
+  {
+    "number": 102,
+    "state": "open",
+    "title": "Dark mode: text unreadable in task detail panel",
+    "body": "In dark mode the description text in the task detail side panel is dark grey on a dark background."
+  },
+  {
+    "number": 103,
+    "state": "open",
+    "title": "CLI `tl sync` hangs when the server is unreachable",
+    "body": "Running tl sync while the server is down blocks forever instead of timing out. Ctrl+C is required."
+  },
+  {
+    "number": 104,
+    "state": "open",
+    "title": "Recurring tasks are created twice at daylight saving change",
+    "body": "A daily recurring task produced two instances on the night the clocks changed."
+  },
+  {
+    "number": 105,
+    "state": "closed",
+    "title": "CSV export drops tasks with commas in the title",
+    "body": "Tasks whose title contains a comma are missing from the exported CSV file because the field is not quoted."
+  },
+  {
+    "number": 106,
+    "state": "open",
+    "title": "Support sub-tasks nested more than three levels deep",
+    "body": "Feature request: allow deeper nesting of sub-tasks for large projects."
+  },
+  {
+    "number": 107,
+    "state": "open",
+    "title": "Webhook delivery retries forever when the endpoint returns 410",
+    "body": "A webhook pointing to a removed endpoint (HTTP 410 Gone) is retried indefinitely and fills the queue."
+  },
+  {
+    "number": 108,
+    "state": "open",
+    "title": "REST API pagination cursor breaks when sorting by due date",
+    "body": "Using the cursor from the previous page together with sort=due_date returns duplicated or missing tasks."
+  },
+  {
+    "number": 109,
+    "state": "open",
+    "title": "Memory usage grows steadily in the notifications worker",
+    "body": "The notifications worker process memory increases by about 50 MB per day until the container is restarted."
+  },
+  {
+    "number": 110,
+    "state": "open",
+    "title": "Add keyboard shortcuts for completing a task",
+    "body": "It would be nice to complete the selected task with a keyboard shortcut."
+  },
+  {
+    "number": 111,
+    "state": "open",
+    "title": "Calendar view shows tasks on the wrong day for UTC+13 timezones",
+    "body": "For users in New Zealand daylight time tasks due late in the evening show up on the previous day."
+  },
+  {
+    "number": 112,
+    "state": "open",
+    "title": "GitHub OAuth login fails with state mismatch error",
+    "body": "Signing in with GitHub redirects back with an error: OAuth state mismatch. Happens in every browser."
+  },
+  {
+    "number": 113,
+    "state": "open",
+    "title": "Attachment upload fails for files larger than 10 MB",
+    "body": "Uploading a PDF of 12 MB fails with a generic error. Smaller files work fine."
+  },
+  {
+    "number": 114,
+    "state": "open",
+    "title": "Docker container exits when DATABASE_URL contains special characters",
+    "body": "If the database password contains characters such as @ or #, the container exits immediately with a parse error."
+  },
+  {
+    "number": 115,
+    "state": "open",
+    "title": "Drag and drop reordering resets after page refresh",
+    "body": "Reordering tasks by drag and drop looks fine but the previous order comes back after refreshing."
+  },
+  {
+    "number": 116,
+    "state": "open",
+    "title": "Email reminders are sent in the server timezone instead of the user timezone",
+    "body": "Reminder emails go out at the configured hour of the server, not the hour in the user profile timezone."
+  },
+  {
+    "number": 117,
+    "state": "open",
+    "title": "Search ignores accented characters",
+    "body": "Searching for 'cafe' does not find a task titled 'Café menu' and the other way around."
+  },
+  {
+    "number": 118,
+    "state": "open",
+    "title": "Import from Trello loses labels",
+    "body": "Cards imported from a Trello JSON export arrive without their labels."
+  },
+  {
+    "number": 119,
+    "state": "closed",
+    "title": "How to configure SMTP with STARTTLS?",
+    "body": "Question about the SMTP settings for a server that requires STARTTLS on port 587."
+  },
+  {
+    "number": 120,
+    "state": "open",
+    "title": "API rate limit headers are missing on 429 responses",
+    "body": "429 responses do not include Retry-After or X-RateLimit headers."
+  }
+]
