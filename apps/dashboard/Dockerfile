@@ -1,5 +1,5 @@
 # Build context: repository root (see docker-compose.yml).
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
 WORKDIR /repo
