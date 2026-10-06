@@ -21,10 +21,10 @@ jobs:
         env:
           POSTGRES_USER: agent
           POSTGRES_PASSWORD: agent
-          POSTGRES_DB: agent_platform
+          POSTGRES_DB: agent_platform_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U agent -d agent_platform"
+          --health-cmd "pg_isready -U agent -d agent_platform_test"
           --health-interval 3s --health-timeout 3s --health-retries 20
       redis:
         image: redis:7-alpine
@@ -33,7 +33,7 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 3s --health-timeout 3s --health-retries 20
     env:
-      DATABASE_URL: postgres://agent:agent@localhost:5432/agent_platform
+      DATABASE_URL: postgres://agent:agent@localhost:5432/agent_platform_test
       REDIS_URL: redis://localhost:6379
       # Pull requests only run what the diff affects; pushes to main run everything.
       TURBO_FILTER: ${{ github.event_name == 'pull_request' && format('--filter=...[origin/{0}]', github.base_ref) || '' }}
@@ -57,3 +57,5 @@ jobs:
         run: pnpm turbo run typecheck $TURBO_FILTER
       - name: Test
         run: pnpm turbo run test $TURBO_FILTER
+      - name: Crash recovery demo (kills a worker, verifies resume and no double execution)
+        run: pnpm crash-demo

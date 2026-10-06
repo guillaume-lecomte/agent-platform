@@ -9,3 +9,5 @@ context, the choice and its consequences, so a reader can disagree with specific
 | [0002](0002-drizzle-orm.md)                   | Drizzle instead of Prisma                              |
 | [0003](0003-explicit-llm-provider.md)         | The LLM provider is selected explicitly                |
 | [0004](0004-build-to-dist-and-explicit-di.md) | Packages build to `dist`; Nest uses explicit `@Inject` |
+| [0005](0005-durable-execution-semantics.md)   | Durable execution: guarantees and mechanisms           |
+| [0006](0006-static-agent-registry.md)         | Agents are registered statically                       |
