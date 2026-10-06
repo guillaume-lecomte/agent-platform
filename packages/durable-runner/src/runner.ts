@@ -203,6 +203,7 @@ export class AgentRunner {
       const request: LLMRequest = {
         messages,
         signal,
+        metadata: { taskId, agentId: task.agentId, agentVersion: task.agentVersion },
         ...(toolSpecs.length > 0 ? { tools: toolSpecs } : {}),
         ...(definition.model ? { model: definition.model } : {}),
         ...(definition.routing

@@ -1,6 +1,6 @@
 import type { Config } from './config.js';
 import { AnthropicProvider } from './llm/anthropic.js';
-import { MockProvider, type MockResponder } from './llm/mock.js';
+import { MockProvider, type MockProviderOptions, type MockResponder } from './llm/mock.js';
 import { OpenAIProvider } from './llm/openai.js';
 import type { LLMProvider } from './llm/types.js';
 
@@ -8,6 +8,8 @@ export interface CreateProviderOptions {
   /** Scripted behaviour for the mock provider (agents supply their own). */
   mockResponder?: MockResponder;
   mockRecordingsDir?: string;
+  /** Simulated latency model for the mock provider (see MockProviderOptions). */
+  mockSimulatedLatency?: MockProviderOptions['simulatedLatencyMs'];
 }
 
 /**
@@ -31,6 +33,9 @@ export function createProvider(config: Config, options: CreateProviderOptions = 
       return new MockProvider({
         ...(options.mockResponder ? { responder: options.mockResponder } : {}),
         ...(options.mockRecordingsDir ? { recordingsDir: options.mockRecordingsDir } : {}),
+        ...(options.mockSimulatedLatency
+          ? { simulatedLatencyMs: options.mockSimulatedLatency }
+          : {}),
         realDelayMs: config.MOCK_DELAY_MS,
       });
   }

@@ -31,6 +31,13 @@ export interface RoutingHints {
   cache?: boolean;
 }
 
+/** Context attached to a request for tracking and tracing; never sent to a model. */
+export interface RequestMetadata {
+  taskId?: string;
+  agentId?: string;
+  agentVersion?: string;
+}
+
 export interface LLMRequest {
   /** Explicit model. When omitted, a router (or the provider default) picks one. */
   model?: string;
@@ -39,6 +46,7 @@ export interface LLMRequest {
   maxOutputTokens?: number;
   temperature?: number;
   hints?: RoutingHints;
+  metadata?: RequestMetadata;
   signal?: AbortSignal;
 }
 

@@ -21,7 +21,10 @@ const schema = z
     OPENAI_MODEL: z.string().default('gpt-5.5'),
     /** Real delay added to every mock LLM call, to make long tasks observable in demos. */
     MOCK_DELAY_MS: z.coerce.number().int().min(0).default(0),
-    AGENTS_DIR: z.string().default('./agents'),
+    /** Folder with pricing.yaml and the routing policy. */
+    CONFIG_DIR: z.string().default('./config'),
+    /** Routing policy file, relative to CONFIG_DIR. */
+    ROUTER_POLICY: z.string().default('routing.yaml'),
     OTEL_EXPORTER_OTLP_ENDPOINT: optionalString,
   })
   .superRefine((cfg, ctx) => {
