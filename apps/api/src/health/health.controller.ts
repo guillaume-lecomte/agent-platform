@@ -30,14 +30,19 @@ export class HealthController {
   }
 
   private async probe(fn: () => Promise<void>): Promise<CheckResult> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
         fn(),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('timeout')), 2000);
+        }),
       ]);
       return 'up';
     } catch {
       return 'down';
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

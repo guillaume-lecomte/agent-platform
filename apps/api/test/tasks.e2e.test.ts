@@ -239,7 +239,7 @@ describe('REST API', () => {
   it('maps errors to HTTP statuses', async () => {
     const started = await startApp();
     app = started.app;
-    expect((await call(started.url, '/tasks/00000000-0000-0000-0000-000000000000')).status).toBe(
+    expect((await call(started.url, '/tasks/3f0c1b2e-8d4a-4c6b-9e1f-7a2b3c4d5e6f')).status).toBe(
       404,
     );
     expect(
@@ -249,11 +249,20 @@ describe('REST API', () => {
       (await call(started.url, '/tasks', 'POST', { agentId: 'nope', input: issue })).status,
     ).toBe(404);
     expect((await call(started.url, '/approvals?status=weird')).status).toBe(400);
+    // Malformed ids are rejected up front instead of reaching the database.
+    const malformed = await call(started.url, '/tasks/not-a-uuid');
+    expect(malformed.status).toBe(400);
+    expect(malformed.body).toMatchObject({ error: 'invalid_request' });
+    expect((await call(started.url, '/approvals?taskId=nope')).status).toBe(400);
+    expect((await call(started.url, '/tasks?limit=0')).status).toBe(400);
+    expect(
+      (await call(started.url, '/tasks', 'POST', { input: issue, tokenBudget: 10_000_000 })).status,
+    ).toBe(400);
     expect(
       (
         await call(
           started.url,
-          '/approvals/00000000-0000-0000-0000-000000000000/approve',
+          '/approvals/3f0c1b2e-8d4a-4c6b-9e1f-7a2b3c4d5e6f/approve',
           'POST',
           {},
         )

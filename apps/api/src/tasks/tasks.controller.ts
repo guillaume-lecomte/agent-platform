@@ -7,6 +7,7 @@ import {
   HttpCode,
   Inject,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Res,
@@ -22,8 +23,12 @@ const createSchema = z.object({
     .optional(),
   input: z.unknown(),
   idempotencyKey: z.string().min(1).max(200).optional(),
-  tokenBudget: z.number().int().positive().optional(),
+  tokenBudget: z.number().int().positive().max(1_000_000).optional(),
 });
+
+const listSchema = z.object({ limit: z.coerce.number().int().min(1).max(500).default(100) });
+const statusSchema = z.object({ status: z.enum(['pending', 'approved', 'denied']).optional() });
+const uuid = new ParseUUIDPipe({ version: '4' });
 
 const decisionSchema = z.object({ reason: z.string().max(1000).optional() });
 const denySchema = z.object({
@@ -47,9 +52,7 @@ export class TasksController {
       input: parsed.input,
       agentVersion: parsed.agentVersion,
       tokenBudget: parsed.tokenBudget,
-      ...((parsed.idempotencyKey ?? headerKey)
-        ? { idempotencyKey: (parsed.idempotencyKey ?? headerKey)! }
-        : {}),
+      idempotencyKey: parsed.idempotencyKey ?? headerKey,
     });
     res.status(created ? 201 : 200);
     return task;
@@ -57,43 +60,42 @@ export class TasksController {
 
   @Get('tasks')
   list(@Query('limit') limit?: string) {
-    return this.service.listTasks({ limit: Math.min(Number(limit) || 100, 500) });
+    return this.service.listTasks({ limit: listSchema.parse({ limit }).limit });
   }
 
   @Get('tasks/:id')
-  get(@Param('id') id: string) {
+  get(@Param('id', uuid) id: string) {
     return this.service.getTask(id);
   }
 
   @Get('tasks/:id/steps')
-  steps(@Param('id') id: string) {
+  steps(@Param('id', uuid) id: string) {
     return this.service.getSteps(id);
   }
 
   @Post('tasks/:id/cancel')
   @HttpCode(200)
-  cancel(@Param('id') id: string) {
+  cancel(@Param('id', uuid) id: string) {
     return this.service.cancel(id);
   }
 
   @Get('approvals')
-  approvals(@Query('status') status?: string, @Query('taskId') taskId?: string) {
-    const parsed = z.enum(['pending', 'approved', 'denied']).optional().parse(status);
-    return this.service.listApprovals({
-      status: parsed,
-      ...(taskId ? { taskId } : {}),
-    });
+  approvals(
+    @Query('status') status?: string,
+    @Query('taskId', new ParseUUIDPipe({ version: '4', optional: true })) taskId?: string,
+  ) {
+    return this.service.listApprovals({ status: statusSchema.parse({ status }).status, taskId });
   }
 
   @Post('approvals/:id/approve')
   @HttpCode(200)
-  approve(@Param('id') id: string, @Body() body: unknown) {
+  approve(@Param('id', uuid) id: string, @Body() body: unknown) {
     return this.service.approve(id, decisionSchema.parse(body ?? {}).reason);
   }
 
   @Post('approvals/:id/deny')
   @HttpCode(200)
-  deny(@Param('id') id: string, @Body() body: unknown) {
+  deny(@Param('id', uuid) id: string, @Body() body: unknown) {
     return this.service.deny(id, denySchema.parse(body ?? {}).reason);
   }
 }
