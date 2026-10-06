@@ -3,7 +3,6 @@ version: v3
 description: v1 with a reply-length instruction. Behaviourally equivalent in mock mode; used to demonstrate a successful promotion.
 routing:
   taskType: issue-triage
-  complexity: medium
 tools:
   - search_similar_issues
   - add_labels

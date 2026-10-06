@@ -12,8 +12,7 @@ import type { MockReply, MockResponder, Message } from '@agent-platform/core';
  *   "area labels"                      -> adds area:* labels
  *
  * It also models a capability gap between the two mock models: `mock-small` only reads the
- * title and the first 160 characters of the body, and rarely commits to "duplicate";
- * `mock-large` reads the whole issue. Scores obtained with it show that the pipeline
+ * title and the first 160 characters of the body; `mock-large` reads the whole issue. Scores obtained with it show that the pipeline
  * (agent -> evals -> gate) works; they say nothing about real model quality.
  * Use the real-provider workflow for that.
  */
@@ -168,7 +167,7 @@ function lastSearch(messages: Message[]): SearchResult | undefined {
   return undefined;
 }
 
-export const DUPLICATE_THRESHOLD = { large: 0.5, small: 0.85 } as const;
+export const DUPLICATE_THRESHOLD = 0.5;
 
 export const issueTriageResponder: MockResponder = ({ model, messages }): MockReply => {
   const system = messages.find((m) => m.role === 'system')?.content ?? '';
@@ -187,8 +186,7 @@ export const issueTriageResponder: MockResponder = ({ model, messages }): MockRe
   }
 
   const top = flags.search ? lastSearch(messages) : undefined;
-  const threshold = small ? DUPLICATE_THRESHOLD.small : DUPLICATE_THRESHOLD.large;
-  const isDuplicate = top !== undefined && top.similarity >= threshold;
+  const isDuplicate = top !== undefined && top.similarity >= DUPLICATE_THRESHOLD;
   const category: Category = isDuplicate ? 'duplicate' : classify(text, issue.title);
   const duplicateOf = isDuplicate ? top.number : null;
   const priority = prioritize(category, text, flags, small);

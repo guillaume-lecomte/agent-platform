@@ -1,10 +1,10 @@
 id: issue-triage
 version: v1
 description: Reference prompt. Searches for duplicates, applies a priority rubric, asks for missing information.
-# No explicit model: the cost router picks one from these hints (provider default otherwise).
+# No explicit model and no complexity: the cost router picks the model from these hints and
+# from its own estimate of the input size (provider default when there is no router).
 routing:
   taskType: issue-triage
-  complexity: medium
 tools:
   - search_similar_issues
   - add_labels

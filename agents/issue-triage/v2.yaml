@@ -3,7 +3,6 @@ version: v2
 description: Shorter prompt written to cut tokens and latency. Drops the duplicate search, the rubric and the follow-up questions.
 routing:
   taskType: issue-triage
-  complexity: medium
 tools:
   - search_similar_issues
   - add_labels
