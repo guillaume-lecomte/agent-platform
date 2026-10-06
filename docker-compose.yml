@@ -47,5 +47,14 @@ services:
       redis:
         condition: service_healthy
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    ports:
+      - '8080:80'
+    depends_on:
+      - api
+
 volumes:
   pgdata:

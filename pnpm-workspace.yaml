@@ -9,6 +9,7 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  protobufjs: false
 
 catalog:
   typescript: ~6.0.3
@@ -32,3 +33,4 @@ minimumReleaseAgeExclude:
   - '@typescript-eslint/visitor-keys@8.71.1'
   - typescript-eslint@8.71.1
   - '@modelcontextprotocol/sdk@1.32.1'
+  - vite@8.3.3

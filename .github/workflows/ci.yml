@@ -119,7 +119,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: [api]
+        app: [api, dashboard]
     steps:
       - uses: actions/checkout@v4
       - name: Build image (not published)
