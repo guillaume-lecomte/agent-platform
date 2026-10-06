@@ -62,7 +62,7 @@ jobs:
           pnpm evals run --agent "${{ inputs.agent }}" --version "${{ inputs.version }}" \
             --baseline none --out reports --summary-file reports/summary.md
           cat reports/summary.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.secret.outputs.present == 'true' && !cancelled()
         with:
           name: eval-reports-real
