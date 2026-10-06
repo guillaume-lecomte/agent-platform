@@ -160,3 +160,35 @@ describe('toLLMError', () => {
     expect(toLLMError(e, 'p')).toBe(e);
   });
 });
+
+describe('provider error details', () => {
+  it('reads Retry-After in seconds or as a date', () => {
+    const withHeader = (value: string) =>
+      Object.assign(new Error('slow down'), {
+        status: 429,
+        headers: new Headers({ 'retry-after': value }),
+      });
+    expect(toLLMError(withHeader('7'), 'p').retryAfterMs).toBe(7000);
+    const inTwoSeconds = new Date(Date.now() + 2000).toUTCString();
+    expect(toLLMError(withHeader(inTwoSeconds), 'p').retryAfterMs).toBeGreaterThan(0);
+    expect(toLLMError(withHeader('soon'), 'p').retryAfterMs).toBeUndefined();
+  });
+
+  it('keeps malformed tool arguments from OpenAI instead of throwing', async () => {
+    const client: OpenAILike = {
+      responses: {
+        async create() {
+          return {
+            model: 'gpt-x',
+            output: [{ type: 'function_call', call_id: 'f1', name: 'a', arguments: '{"z": ' }],
+            usage: { input_tokens: 1, output_tokens: 1 },
+          };
+        },
+      },
+    };
+    const res = await new OpenAIProvider({ client, defaultModel: 'gpt-x' }).complete({
+      messages: [],
+    });
+    expect(res.toolCalls[0]?.arguments).toEqual({ _raw: '{"z": ' });
+  });
+});

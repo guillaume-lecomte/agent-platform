@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { sleep } from '../time.js';
 import { LLMError } from './errors.js';
 import { hashRequest } from './hash.js';
 import { estimateUsage } from './tokens.js';
-import type { LLMProvider, LLMRequest, LLMResponse, StopReason, ToolCall, Usage } from './types.js';
+import type { LLMProvider, LLMRequest, LLMResponse, ToolCall, Usage } from './types.js';
 
 /** What a responder returns: the assistant turn, without bookkeeping. */
 export interface MockReply {
@@ -70,7 +71,11 @@ export class MockProvider implements LLMProvider {
 
   async complete(request: LLMRequest): Promise<LLMResponse> {
     this.callCount += 1;
-    if (this.opts.realDelayMs) await abortableSleep(this.opts.realDelayMs, request.signal);
+    if (this.opts.realDelayMs) {
+      await sleep(this.opts.realDelayMs, request.signal).catch(() => {
+        throw new LLMError('aborted', 'Aborted');
+      });
+    }
     const scripted = this.scriptedErrors.shift();
     if (scripted) throw scripted;
 
@@ -136,7 +141,6 @@ export class MockProvider implements LLMProvider {
     if (!this.opts.recordingsDir) return;
     await mkdir(this.opts.recordingsDir, { recursive: true });
     const last = request.messages[request.messages.length - 1];
-    const stopReason: StopReason = response.stopReason;
     const recording: Recording = {
       request: {
         model: response.model,
@@ -148,7 +152,7 @@ export class MockProvider implements LLMProvider {
         toolCalls: response.toolCalls,
         model: response.model,
         usage: response.usage,
-        stopReason,
+        stopReason: response.stopReason,
       },
     };
     await writeFile(
@@ -156,19 +160,4 @@ export class MockProvider implements LLMProvider {
       JSON.stringify(recording, null, 2) + '\n',
     );
   }
-}
-
-function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(new LLMError('aborted', 'Aborted'));
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      reject(new LLMError('aborted', 'Aborted'));
-    };
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
 }

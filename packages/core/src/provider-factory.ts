@@ -33,9 +33,7 @@ export function createProvider(config: Config, options: CreateProviderOptions = 
       return new MockProvider({
         responder: options.mockResponder,
         recordingsDir: options.mockRecordingsDir,
-        ...(options.mockSimulatedLatency
-          ? { simulatedLatencyMs: options.mockSimulatedLatency }
-          : {}),
+        simulatedLatencyMs: options.mockSimulatedLatency,
         realDelayMs: config.MOCK_DELAY_MS,
       });
   }

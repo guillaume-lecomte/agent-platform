@@ -112,7 +112,7 @@ export class OpenAIProvider implements LLMProvider {
           toolCalls.push({
             id: c.call_id,
             name: c.name,
-            arguments: c.arguments ? (JSON.parse(c.arguments) as Record<string, unknown>) : {},
+            arguments: parseArguments(c.arguments),
           });
         }
       }
@@ -136,5 +136,21 @@ export class OpenAIProvider implements LLMProvider {
     } catch (err) {
       throw toLLMError(err, this.name);
     }
+  }
+}
+
+/**
+ * Models occasionally return malformed JSON arguments. Keep the raw text instead of throwing:
+ * schema validation in the runner then rejects the call and tells the model what was wrong.
+ */
+function parseArguments(raw: string): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : { _raw: raw };
+  } catch {
+    return { _raw: raw };
   }
 }
