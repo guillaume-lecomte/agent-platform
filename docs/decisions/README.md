@@ -13,3 +13,4 @@ context, the choice and its consequences, so a reader can disagree with specific
 | [0006](0006-static-agent-registry.md)         | Agents are registered statically                             |
 | [0007](0007-mock-model-is-a-test-double.md)   | The mock model follows the prompt; not a quality measurement |
 | [0008](0008-eval-gate-and-baseline.md)        | How the eval gate decides                                    |
+| [0009](0009-cost-router-design.md)            | Cost router design                                           |

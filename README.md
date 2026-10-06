@@ -2,7 +2,7 @@
 
 AI agents fail in production in three predictable ways: a long task dies halfway and restarts from scratch (or repeats a side effect), every call goes to the most expensive model, and a prompt tweak quietly degrades quality. This monorepo shows one way to address each: durable execution, cost-aware routing, and evals that gate CI.
 
-> **Status: v0.3.0.** Durable execution and the eval gate are done and demonstrable. The cost router and the dashboard land in the next milestones (table below). Nothing in this README claims a result that the repository cannot reproduce.
+> **Status: v0.4.0.** Durable execution, the eval gate and the cost router are done and demonstrable. The dashboard lands in the next milestone (table below). Nothing in this README claims a result that the repository cannot reproduce.
 
 ## Architecture
 
@@ -16,7 +16,10 @@ flowchart LR
   svc -- "advance task" --> redis[(Redis · BullMQ + events)]
   redis --> worker
   runner -- "steps, tool registry, approvals" --> pg[(PostgreSQL)]
-  runner -- complete --> llm[LLMProvider: mock / Anthropic / OpenAI]
+  runner -- complete --> router[CostRouter: policy, cache, fallback, tracking]
+  router --> llm[LLMProvider: mock / Anthropic / OpenAI]
+  router -- cache --> redis
+  router -- "llm_calls" --> pg
   runner -- execute --> tools[Tools: search, add_labels, post_comment]
 ```
 
@@ -193,6 +196,49 @@ alone would understate.
 
 `active.json` records the demonstration above (initial, promote v3, rollback to v1).
 
+## `packages/cost-router`
+
+**Problem:** calling the strongest model for everything is expensive and slow.
+
+**Approach:**
+
+- A declarative policy ([`config/routing.yaml`](config/routing.yaml)) picks the model per call from the
+  task type and an estimated complexity (input length, number of tools, or a hint from the caller),
+  with a default model and a fallback per rule.
+- On an error or a timeout the call falls back to the backup model; both attempts are recorded.
+- Exact repeats are served from a Redis cache (TTL in the policy, bypassable per request).
+- Every attempt is stored in PostgreSQL with model, tokens, cost, latency and cache hit/miss, exposed
+  as Prometheus metrics (`llm_*`) and at `GET /costs`. Prices come from
+  [`config/pricing.yaml`](config/pricing.yaml), where each model has a source and a date.
+  Design notes: [ADR 0009](docs/decisions/0009-cost-router-design.md).
+
+**See it work:**
+
+```bash
+curl -s localhost:3000/costs        # per-model cost and latency, after running a few tasks
+pnpm benchmark                      # the comparison below
+```
+
+**Benchmark** (2026-10-06, `pnpm benchmark`, mock provider, 40 cases of the issue-triage suite,
+agent `issue-triage@v1`; the full output with its configuration is in
+[docs/benchmark-routing.md](docs/benchmark-routing.md) and CI checks that it is reproducible):
+
+| Strategy                               | Eval score | Cost (simulated) | Avg latency / task (simulated) | Calls per model                 |
+| -------------------------------------- | ---------: | ---------------: | -----------------------------: | ------------------------------- |
+| always large                           |      96.9% |           $0.497 |                         5.88 s | mock-large ×160                 |
+| always small                           |      95.3% |          $0.0412 |                         1.45 s | mock-small ×160                 |
+| routing                                |      96.5% |           $0.182 |                         2.79 s | mock-large ×48, mock-small ×112 |
+| routing, 2nd run (warm cache, 160 hit) |      96.5% |          $0.0000 |                         0.00 s | cached                          |
+
+> **Everything in this table is simulated.** Prices are illustrative (a "large" model about 12×
+> a "small" one), latencies come from a formula in the pricing file, and scores come from a
+> scripted model whose "small" version simply reads less of the issue
+> ([ADR 0007](docs/decisions/0007-mock-model-is-a-test-double.md)). The table shows that the
+> mechanism routes short inputs to the small model and keeps quality close to the large one, not
+> what it would save with real models. The length thresholds were read off this dataset, so the
+> routing row is tuned to it. To measure real models:
+> `LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=… ROUTER_POLICY=routing.anthropic.yaml pnpm benchmark --large claude-sonnet-5-5 --small claude-haiku-4-5-20251001`.
+
 ## Decisions
 
 Architecture decision records live in [docs/decisions](docs/decisions/README.md).
@@ -204,6 +250,7 @@ Architecture decision records live in [docs/decisions](docs/decisions/README.md)
 - A crashed worker's task resumes after BullMQ's lock timeout, not instantly.
 - A model call interrupted by a crash is paid again on resume.
 - Mock-mode eval scores are produced by a test double; they validate the pipeline, not a model.
+- Cost accounting uses plain input/output prices (no provider prompt-cache or batch discounts); the cache is exact-match only.
 - Tool calls within one model turn run sequentially.
 
 ## Roadmap

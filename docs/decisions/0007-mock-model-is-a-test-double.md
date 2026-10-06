@@ -14,7 +14,8 @@ In mock mode, the agent's `MockProvider` uses a scripted responder (`agents/issu
 that reads the system prompt for specific instructions ("search for similar issues first", the
 `P0:`…`P3:` rubric, "ask for reproduction steps", area labels) and behaves as a model following them
 would. Two mock models differ in capability: `mock-small` reads only the title and the first 160
-characters of the body, and rarely commits to "duplicate"; `mock-large` reads everything.
+characters of the body; `mock-large` reads everything. (This gives the cost router something to
+route on: short issues are handled equally well by both, long ones are not.)
 Recordings keyed by request hash are still supported (and are how real answers would be recorded
 when a key is available), but none are committed.
 

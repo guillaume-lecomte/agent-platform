@@ -62,6 +62,12 @@ jobs:
         run: pnpm turbo run test $TURBO_FILTER
       - name: Crash recovery demo (kills a worker, verifies resume and no double execution)
         run: pnpm crash-demo
+      # The numbers quoted in the README come from this script. Mock mode is deterministic, so
+      # the committed file must match a fresh run (the date line is ignored).
+      - name: Routing benchmark is reproducible
+        run: |
+          pnpm benchmark --out docs/benchmark-routing.md
+          git diff --exit-code -I'^- Date:' docs/benchmark-routing.md
       # Fails the job when the deployed agent version scores below the committed baseline
       # (overall or per category, beyond the thresholds in evals/<agent>/suite.yaml).
       # Turborepo only runs it when the agent, the eval tooling or the suite changed.
