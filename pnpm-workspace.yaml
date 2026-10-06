@@ -3,10 +3,12 @@ packages:
   - apps/*
   - agents/*
   - evals/*
+  - scripts
 
 # Single source of truth for dependency versions shared across packages.
 allowBuilds:
   esbuild: true
+  msgpackr-extract: true
 
 catalog:
   typescript: ~6.0.3

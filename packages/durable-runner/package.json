@@ -1,0 +1,41 @@
+{
+  "name": "@agent-platform/durable-runner",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Checkpointed, resumable agent execution on BullMQ and PostgreSQL.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "drizzle"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@agent-platform/core": "workspace:*",
+    "bullmq": "^6.3.11",
+    "drizzle-orm": "^0.45.3",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.15.0",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
