@@ -1,23 +1,30 @@
 # Roadmap
 
-Delivered milestones are listed in [README.md](README.md). Items below were deliberately left
-out of the POC or deferred; each one would strengthen the demonstration less than it would
-cost in complexity.
+## Delivered
 
-## Planned
+| Tag    | Milestone                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------- |
+| v0.1.0 | Monorepo, `core` with the mock provider, `docker compose` for Redis, PostgreSQL and the API |
+| v0.2.0 | Durable runner: checkpoints, tool registry, human approval, crash demo                      |
+| v0.3.0 | Evals: suites, baseline gate in CI, promote and rollback                                    |
+| v0.4.0 | Cost router: policy routing, fallback, cache, cost tracking, benchmark                      |
+| v0.5.0 | Dashboard, architecture docs, optional OpenTelemetry                                        |
 
-- `apps/incident-copilot`: a second reference agent (incident triage) reusing the runner,
-  the router and the eval tooling. Directory reserved, not started.
-- `proto-to-mcp` integration: the MCP client adapter in `@agent-platform/core` is ready to
-  consume tools from that (separate) project.
+## Next
 
-## Deferred
+- `apps/incident-copilot`: a second reference agent (incident triage) reusing the runner, the router and the
+  eval tooling. Not started.
+- `proto-to-mcp` integration: the MCP client adapter in `@agent-platform/core` can already consume the tools
+  that separate project generates.
 
-- Authentication and multi-tenancy (the API and dashboard are open; documented limit).
-- Kubernetes manifests, high availability of Redis or PostgreSQL.
-- Semantic (embedding-based) response cache; only exact-match caching is implemented.
-- Provider prompt-cache and batch pricing in the cost model; only plain input/output prices are used.
-- OpenAI entries in `config/pricing.yaml` (the price source could not be read; see ADR 0009).
-- Routing on observed quality (learning thresholds from eval results) instead of hand-set thresholds.
-- Pricing is read from `config/pricing.yaml`, which is maintained by hand. Fetching prices
-  automatically is out of scope.
+## Deliberately left out
+
+Each of these would cost more complexity than it would add to the demonstration.
+
+- Authentication and multi-tenancy. The API and the dashboard are open; this is a documented limit.
+- Kubernetes manifests, high availability for Redis or PostgreSQL.
+- A semantic (embedding-based) response cache. Only exact-match caching is implemented.
+- Provider prompt-cache and batch pricing in the cost model. Only plain input and output prices are used.
+- OpenAI prices in `config/pricing.yaml`: the source could not be read when the file was written (ADR 0009).
+- Routing driven by observed quality (thresholds learned from eval results) instead of hand-set thresholds.
+- Fetching prices automatically; `config/pricing.yaml` is maintained by hand.

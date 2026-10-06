@@ -250,6 +250,7 @@ Observability: JSON logs (pino), Prometheus metrics at `GET /metrics`, and optio
 - Agents are registered statically ([ADR 0006](docs/decisions/0006-static-agent-registry.md)).
 
 More decisions are recorded in [docs/decisions](docs/decisions/README.md). What was left out is in [ROADMAP.md](ROADMAP.md).
+To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md); to report a security issue, [SECURITY.md](SECURITY.md).
 
 ## License
 
