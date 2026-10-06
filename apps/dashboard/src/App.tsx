@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { ApprovalsPage } from './pages/ApprovalsPage.js';
 import { CostsPage } from './pages/CostsPage.js';
 import { TasksPage } from './pages/TasksPage.js';
-import { useLive } from './useLive.js';
+import { useConnected, useLive } from './useLive.js';
 
 type Route = 'tasks' | 'approvals' | 'costs';
 
@@ -21,6 +21,7 @@ export function App() {
   }, []);
 
   const pending = useLive(() => api.approvals('pending'));
+  const connected = useConnected();
   const waiting = pending.data?.length ?? 0;
 
   const link = (to: Route, label: string, badge?: number) => (
@@ -43,11 +44,8 @@ export function App() {
           {link('approvals', 'Approvals', waiting)}
           {link('costs', 'Costs & latency')}
         </nav>
-        <span
-          className={`live ${pending.connected ? 'on' : 'off'}`}
-          title="Server-sent events stream"
-        >
-          {pending.connected ? 'live' : 'reconnecting…'}
+        <span className={`live ${connected ? 'on' : 'off'}`} title="Server-sent events stream">
+          {connected ? 'live' : 'reconnecting…'}
         </span>
       </header>
       <main>
