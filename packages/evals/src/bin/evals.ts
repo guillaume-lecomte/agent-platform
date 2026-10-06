@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { baselineFromReport, writeBaseline } from '../baseline.js';
 import { evalsDir, evaluateVersion } from '../evaluate.js';
+import { gateSchema } from '../suite.js';
 
 const USAGE = `Usage:
   evals run --agent <id> --version <vN> [--baseline <path>|none] [--out <dir>]
@@ -12,6 +13,16 @@ const USAGE = `Usage:
   evals baseline --agent <id> --version <vN>      Record the current scores as the baseline
 
 Exit code 1 when the baseline gate fails.`;
+
+/** A drop threshold given on the command line, as a fraction (0.05 = 5 points). */
+function threshold(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > 1) {
+    throw new Error(`invalid threshold "${value}": expected a number between 0 and 1`);
+  }
+  return n;
+}
 
 async function main(): Promise<number> {
   const { positionals, values } = parseArgs({
@@ -52,14 +63,10 @@ async function main(): Promise<number> {
       version: values.version,
       baselinePath: values.baseline,
       outDir: values.out,
-      gateOverrides: {
-        ...(values['max-overall-drop']
-          ? { max_overall_drop: Number(values['max-overall-drop']) }
-          : {}),
-        ...(values['max-category-drop']
-          ? { max_category_drop: Number(values['max-category-drop']) }
-          : {}),
-      },
+      gateOverrides: gateSchema.partial().parse({
+        max_overall_drop: threshold(values['max-overall-drop']),
+        max_category_drop: threshold(values['max-category-drop']),
+      }),
     });
     console.log(result.markdown);
     console.log(`\nReport: ${result.reportPaths.json}`);

@@ -15,9 +15,12 @@ export const agentDir = fileURLToPath(new URL('..', import.meta.url));
 
 let corpus: Promise<ExistingIssue[]> | undefined;
 export function loadExistingIssues(): Promise<ExistingIssue[]> {
-  corpus ??= readFile(`${agentDir}data/existing-issues.json`, 'utf8').then(
-    (t) => JSON.parse(t) as ExistingIssue[],
-  );
+  corpus ??= readFile(`${agentDir}data/existing-issues.json`, 'utf8')
+    .then((t) => JSON.parse(t) as ExistingIssue[])
+    .catch((err: unknown) => {
+      corpus = undefined; // do not cache a failure
+      throw err;
+    });
   return corpus;
 }
 
