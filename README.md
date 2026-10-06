@@ -2,7 +2,7 @@
 
 AI agents fail in production in three predictable ways: a long task dies halfway and restarts from scratch (or repeats a side effect), every call goes to the most expensive model, and a prompt tweak quietly degrades quality. This monorepo shows one way to address each: durable execution, cost-aware routing, and evals that gate CI.
 
-> **Status: v0.2.0.** Durable execution is done and demonstrable. Evals, the cost router and the dashboard land in the next milestones (table below). Nothing in this README claims a result that the repository cannot reproduce.
+> **Status: v0.3.0.** Durable execution and the eval gate are done and demonstrable. The cost router and the dashboard land in the next milestones (table below). Nothing in this README claims a result that the repository cannot reproduce.
 
 ## Architecture
 
@@ -140,13 +140,58 @@ A neutral demo agent. It receives a GitHub issue, classifies it (bug, feature, q
 duplicate), estimates a priority, proposes labels and drafts a reply. Tools are simulated
 locally: `search_similar_issues` (read), `add_labels` (reversible), `post_comment` (destructive).
 The deployed version is named in `agents/issue-triage/active.json`; `v1.yaml` is the reference
-prompt and `v2.yaml` a shorter prompt that is deliberately worse (it is what the evals in the
-next milestone must catch).
+prompt, `v2.yaml` a shorter prompt that is deliberately worse (it is what the evals must catch),
+and `v3.yaml` a harmless rewording of `v1` used to demonstrate a successful promotion.
 
 In mock mode a scripted responder stands in for the model. It reads the prompt for specific
 instructions and behaves as a model following them would, so changing the prompt changes the
 behaviour. This is a test double, **not a measurement of any model**; see
 [`responder.ts`](agents/issue-triage/src/responder.ts).
+
+## `packages/evals` and `evals/`
+
+**Problem:** a prompt or model change can degrade the agent and nobody notices.
+
+**Approach:**
+
+- A suite (`evals/issue-triage/suite.yaml`) holds 40 synthetic issues for a fictional project
+  (no personal data): 14 bugs, 9 features, 8 questions, 9 duplicates of known issues. Each case has
+  weighted graders: exact match, regex, JSON-schema validation, presence or absence of a tool call,
+  and an optional LLM judge (skipped in mock mode). Format: [packages/evals/README.md](packages/evals/README.md).
+- A baseline (`baseline.json`) is committed. A run fails if the overall score, **or any category**,
+  drops beyond a threshold (3 points overall, 8 per category by default). Why these rules:
+  [ADR 0008](docs/decisions/0008-eval-gate-and-baseline.md).
+- `pnpm agent promote` moves `active.json` only if the evals pass; `pnpm agent rollback` goes back
+  one deployment, with history.
+- In CI, every pull request runs the gate on the deployed version, only when the agent, the eval
+  tooling or the suite is affected (Turborepo), and a bot comment shows the summary and the gap to
+  the baseline. A manual workflow runs the same suite against a real provider if its secret exists.
+
+**See it work** (mock mode, so deterministic; run on 2026-10-06):
+
+```bash
+pnpm evals run --agent issue-triage --version v1   # the baseline: passes
+pnpm evals run --agent issue-triage --version v2   # exit code 1
+pnpm agent promote issue-triage v2                 # refused, active.json untouched
+pnpm agent promote issue-triage v3                 # evals pass, v3 becomes active
+pnpm agent rollback issue-triage                   # back to v1; see `pnpm agent status issue-triage`
+```
+
+| Version | Overall score | Cases fully passed | Gate                 |
+| ------- | ------------: | -----------------: | -------------------- |
+| v1      |         96.9% |              38/40 | baseline             |
+| v2      |         54.7% |               0/40 | ❌ blocked (-42 pts) |
+| v3      |         96.9% |              38/40 | ✅ promoted          |
+
+`v2` is the "faster, cheaper" prompt: it drops the duplicate search, the priority rubric and the
+follow-up question. Per category, duplicates fall from 100 % to 20 %, which the overall average
+alone would understate.
+
+> **These scores come from a scripted stand-in for the model, not from a real LLM**
+> ([ADR 0007](docs/decisions/0007-mock-model-is-a-test-double.md)). They demonstrate the pipeline,
+> not the quality of any prompt or model. Use the "Evals with a real provider" workflow for that.
+
+`active.json` records the demonstration above (initial, promote v3, rollback to v1).
 
 ## Decisions
 
@@ -158,6 +203,7 @@ Architecture decision records live in [docs/decisions](docs/decisions/README.md)
 - Single Redis and PostgreSQL instance, no high availability, no Kubernetes manifests.
 - A crashed worker's task resumes after BullMQ's lock timeout, not instantly.
 - A model call interrupted by a crash is paid again on resume.
+- Mock-mode eval scores are produced by a test double; they validate the pipeline, not a model.
 - Tool calls within one model turn run sequentially.
 
 ## Roadmap
