@@ -44,7 +44,7 @@ jobs:
       # Pull requests only run what the diff affects; pushes to main run everything.
       TURBO_FILTER: ${{ github.event_name == 'pull_request' && format('--filter=...[origin/{0}]', github.base_ref) || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - run: corepack enable
@@ -125,6 +125,6 @@ jobs:
       matrix:
         app: [api, dashboard]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build image (not published)
         run: docker build -f apps/${{ matrix.app }}/Dockerfile -t agent-platform-${{ matrix.app }}:ci .
