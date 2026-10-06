@@ -8,12 +8,15 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
-    "crash-demo": "tsx crash-demo.ts"
+    "crash-demo": "tsx crash-demo.ts",
+    "benchmark-routing": "tsx benchmark-routing.ts"
   },
   "dependencies": {
     "@agent-platform/agent-issue-triage": "workspace:*",
     "@agent-platform/core": "workspace:*",
+    "@agent-platform/cost-router": "workspace:*",
     "@agent-platform/durable-runner": "workspace:*",
+    "@agent-platform/evals": "workspace:*",
     "pg": "^8.23.1",
     "tsx": "catalog:"
   },
