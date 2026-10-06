@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Reference monorepo for running AI agents in production: durable execution, cost-aware routing, eval-gated CI.",
   "license": "MIT",
+  "author": "Guillaume Lecomte",
   "type": "module",
   "packageManager": "pnpm@12.9.1",
   "engines": {

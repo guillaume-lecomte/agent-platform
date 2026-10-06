@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.gif binary
+*.png binary
+pnpm-lock.yaml linguist-generated=true -diff
+packages/*/drizzle/** linguist-generated=true
+docs/benchmark-routing.md linguist-generated=true

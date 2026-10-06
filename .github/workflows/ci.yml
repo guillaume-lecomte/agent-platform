@@ -11,11 +11,14 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # the eval summary comment
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17-alpine
@@ -117,6 +120,7 @@ jobs:
   docker:
     name: docker (${{ matrix.app }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         app: [api, dashboard]
