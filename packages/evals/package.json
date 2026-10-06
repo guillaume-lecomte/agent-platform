@@ -1,0 +1,41 @@
+{
+  "name": "@agent-platform/evals",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Eval suites, graders, baseline comparison and agent promote/rollback.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "evals": "./dist/bin/evals.js",
+    "agent": "./dist/bin/agent.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent-platform/agent-issue-triage": "workspace:*",
+    "@agent-platform/core": "workspace:*",
+    "@agent-platform/durable-runner": "workspace:*",
+    "yaml": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

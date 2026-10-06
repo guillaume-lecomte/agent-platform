@@ -17,6 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "crash-demo": "turbo run build --filter=@agent-platform/scripts... --output-logs=errors-only && pnpm --filter @agent-platform/scripts crash-demo",
+    "evals": "turbo run build --filter=@agent-platform/evals... --output-logs=errors-only && node packages/evals/dist/bin/evals.js",
+    "agent": "turbo run build --filter=@agent-platform/evals... --output-logs=errors-only && node packages/evals/dist/bin/agent.js",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
