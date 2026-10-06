@@ -1,0 +1,54 @@
+# Model prices used to compute the cost of every LLM call.
+#
+# Rules: every model has a source and the date the price was read. Nothing about prices is
+# hard-coded in the code. Entries with `simulated: true` belong to the mock provider and hold
+# ILLUSTRATIVE numbers (a "large" model about 12x the price of a "small" one); they are not a
+# price list. Costs computed from them are simulated and labelled as such everywhere.
+#
+# To add a model: copy an entry, set provider/input/output, and fill in source and retrieved.
+# OpenAI models are not listed: the pricing page could not be read when this file was written,
+# and unverified prices are not recorded. Add them (with their source) before routing to them.
+version: 1
+updated: 2026-10-06
+currency: USD
+per_tokens: 1000000
+models:
+  mock-large:
+    provider: mock
+    simulated: true
+    input: 3.0
+    output: 15.0
+    source: illustrative values for the mock provider, not a real price list
+    retrieved: 2026-10-06
+    simulation:
+      latency_base_ms: 600
+      latency_ms_per_output_token: 20
+  mock-small:
+    provider: mock
+    simulated: true
+    input: 0.25
+    output: 1.25
+    source: illustrative values for the mock provider, not a real price list
+    retrieved: 2026-10-06
+    simulation:
+      latency_base_ms: 150
+      latency_ms_per_output_token: 5
+
+  claude-sonnet-5-5:
+    provider: anthropic
+    input: 2.0
+    output: 10.0
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    retrieved: 2026-10-06
+  claude-haiku-4-5-20251001:
+    provider: anthropic
+    input: 1.0
+    output: 5.0
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    retrieved: 2026-10-06
+  claude-opus-5-5:
+    provider: anthropic
+    input: 4.0
+    output: 20.0
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    retrieved: 2026-10-06

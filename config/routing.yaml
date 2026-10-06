@@ -1,0 +1,32 @@
+# Routing policy for the mock provider (the default). Declarative: no code decides which model
+# answers; this file does. Rules are evaluated top to bottom, first match wins.
+version: 1
+
+# Used when no rule matches. `fallback` answers if the chosen model errors or times out.
+default:
+  model: mock-large
+  fallback: mock-small
+
+# Per-attempt time limit. A timeout counts as an error and triggers the fallback.
+timeout_ms: 30000
+
+# Exact-match cache of responses (Redis). Callers can bypass it per request with hints.cache=false.
+cache:
+  enabled: true
+  ttl_seconds: 3600
+
+# How complexity is estimated when the caller does not provide `hints.complexity`.
+# The highest level reached by any signal wins.
+complexity:
+  # Length of the first user message (the task input), in characters. The values below were
+  # picked from the length distribution of the issue-triage dataset: bodies longer than about
+  # 160 characters (the mock-small reading window) start around 230 characters of input.
+  input_chars: { medium: 230, high: 400 }
+  # Number of tools offered to the model.
+  tool_count: { medium: 5, high: 10 }
+
+rules:
+  - name: simple-triage-on-small-model
+    when: { task_type: issue-triage, complexity: [low] }
+    model: mock-small
+    fallback: mock-large

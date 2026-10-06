@@ -1,0 +1,20 @@
+# Same policy for real Anthropic models. Use with:
+#   LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=... ROUTER_POLICY=routing.anthropic.yaml
+# Prices come from pricing.yaml (source and date recorded there). The thresholds are the ones of
+# routing.yaml, which were picked for the mock dataset: re-measure before relying on them.
+version: 1
+default:
+  model: claude-sonnet-5-5
+  fallback: claude-haiku-4-5-20251001
+timeout_ms: 60000
+cache:
+  enabled: true
+  ttl_seconds: 3600
+complexity:
+  input_chars: { medium: 230, high: 400 }
+  tool_count: { medium: 5, high: 10 }
+rules:
+  - name: simple-triage-on-small-model
+    when: { task_type: issue-triage, complexity: [low] }
+    model: claude-haiku-4-5-20251001
+    fallback: claude-sonnet-5-5
