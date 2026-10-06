@@ -1,0 +1,10 @@
+node_modules
+dist
+.turbo
+coverage
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+evals/**/reports/
+.mock-recordings.local/
