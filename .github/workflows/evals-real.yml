@@ -1,0 +1,69 @@
+name: Evals with a real provider
+
+# Manual run. Uses a real model, so it costs money and is not deterministic: results are
+# NOT compared with the mock-mode baseline (the numbers are not comparable). The job
+# skips itself, without failing, when the matching secret is not configured.
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: LLM provider
+        type: choice
+        options: [anthropic, openai]
+        default: anthropic
+      agent:
+        description: Agent
+        default: issue-triage
+      version:
+        description: Agent version (vN) or "active"
+        default: active
+      model:
+        description: Model override (optional, otherwise ANTHROPIC_MODEL / OPENAI_MODEL defaults)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  evals-real:
+    runs-on: ubuntu-latest
+    env:
+      LLM_PROVIDER: ${{ inputs.provider }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Check that the secret for the chosen provider exists
+        id: secret
+        run: |
+          key="${{ inputs.provider == 'anthropic' && 'ANTHROPIC_API_KEY' || 'OPENAI_API_KEY' }}"
+          if [ -z "${!key}" ]; then
+            echo "::notice::Secret $key is not configured; skipping."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secret.outputs.present == 'true'
+      - run: corepack enable
+        if: steps.secret.outputs.present == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.secret.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.secret.outputs.present == 'true'
+      - name: Run evals against the real provider
+        if: steps.secret.outputs.present == 'true'
+        env:
+          ANTHROPIC_MODEL: ${{ inputs.provider == 'anthropic' && inputs.model || '' }}
+          OPENAI_MODEL: ${{ inputs.provider == 'openai' && inputs.model || '' }}
+        run: |
+          pnpm evals run --agent "${{ inputs.agent }}" --version "${{ inputs.version }}" \
+            --baseline none --out reports --summary-file reports/summary.md
+          cat reports/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: steps.secret.outputs.present == 'true' && !cancelled()
+        with:
+          name: eval-reports-real
+          path: reports/

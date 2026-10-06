@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   check:
@@ -35,6 +36,8 @@ jobs:
     env:
       DATABASE_URL: postgres://agent:agent@localhost:5432/agent_platform_test
       REDIS_URL: redis://localhost:6379
+      # Always the mock provider in CI: deterministic, free, no secret needed.
+      LLM_PROVIDER: mock
       # Pull requests only run what the diff affects; pushes to main run everything.
       TURBO_FILTER: ${{ github.event_name == 'pull_request' && format('--filter=...[origin/{0}]', github.base_ref) || '' }}
     steps:
@@ -59,3 +62,59 @@ jobs:
         run: pnpm turbo run test $TURBO_FILTER
       - name: Crash recovery demo (kills a worker, verifies resume and no double execution)
         run: pnpm crash-demo
+      # Fails the job when the deployed agent version scores below the committed baseline
+      # (overall or per category, beyond the thresholds in evals/<agent>/suite.yaml).
+      # Turborepo only runs it when the agent, the eval tooling or the suite changed.
+      - name: Evals gate (deployed agent version)
+        id: evals
+        run: pnpm turbo run eval $TURBO_FILTER
+      - name: Evals of changed, non-deployed agent versions (informational)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: BASE_REF=${{ github.base_ref }} ./scripts/eval-changed-versions.sh
+      - name: Collect eval summaries
+        id: summaries
+        if: ${{ !cancelled() }}
+        run: |
+          shopt -s nullglob
+          files=(evals/*/reports/summary*.md)
+          if [ ${#files[@]} -eq 0 ]; then echo "found=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          { echo '<!-- agent-platform-evals -->'; cat "${files[@]}"; } > eval-comment.md
+          cat eval-comment.md >> "$GITHUB_STEP_SUMMARY"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+      - name: Upload eval reports
+        if: ${{ !cancelled() && steps.summaries.outputs.found == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-reports
+          path: |
+            evals/*/reports/
+            eval-comment.md
+      - name: Comment eval summary on the pull request
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.summaries.outputs.found == 'true' }}
+        continue-on-error: true # forks get a read-only token
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('eval-comment.md', 'utf8');
+            const marker = '<!-- agent-platform-evals -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+  docker:
+    name: docker (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [api]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (not published)
+        run: docker build -f apps/${{ matrix.app }}/Dockerfile -t agent-platform-${{ matrix.app }}:ci .
