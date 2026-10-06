@@ -1,0 +1,667 @@
+# Eval suite for the issue-triage agent. See packages/evals for the format.
+name: issue-triage
+suite_version: 1
+description: 40 synthetic issues for the fictional project "Tasklane" (no real data). Each case checks the final JSON answer and the tool calls made.
+agent: issue-triage
+output_schema:
+  {
+    type: object,
+    required: [category, priority, labels, comment],
+    properties:
+      {
+        category: { enum: [bug, feature, question, duplicate] },
+        priority: { enum: [P0, P1, P2, P3] },
+        labels: { type: array, items: { type: string } },
+        duplicate_of: { type: [integer, 'null'] },
+        comment: { type: string, minLength: 1 },
+      },
+  }
+gate: { max_overall_drop: 0.03, max_category_drop: 0.08 }
+cases:
+  - id: bug-01
+    category: bug
+    weight: 1
+    input:
+      number: 201
+      title: Server crashes on startup after upgrading to 2.4.0
+      body: 'After upgrading from 2.3.2 to 2.4.0 the server process exits immediately on startup with "Error: column tasks.archived_at does not exist". Nobody can reach the instance, so all users are locked out. Steps to reproduce: 1) run 2.3.2, 2) pull the 2.4.0 image, 3) start the container. Rolling back is not possible because the migration already ran.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P0, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: thank, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-02
+    category: bug
+    weight: 1
+    input:
+      number: 202
+      title: Deleting a project permanently deletes tasks that belong to other projects
+      body: 'When I delete the project "Archive 2024" every task I had moved out of it earlier is gone as well, including tasks in two other active projects. This is data loss and there is no trash to recover from. Steps to reproduce: create two projects, move a task from A to B, delete A, open B. Version 2.4.1.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P0, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: thank, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-03
+    category: bug
+    weight: 1
+    input:
+      number: 203
+      title: 'XSS: task title is rendered unescaped in notification emails'
+      body: A task titled <img src=x onerror=alert(1)> renders as HTML in the reminder email, so any user who can create a task can inject markup into emails sent to their teammates. This looks like a stored XSS vulnerability in the email template.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P0, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: array_includes, path: labels, value: security, weight: 1 }
+      - { type: regex, path: comment, pattern: reproduc, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-04
+    category: bug
+    weight: 1
+    input:
+      number: 204
+      title: Complete button does nothing in Firefox 128
+      body: 'Clicking the checkmark on a task does nothing in Firefox 128 on Linux, nothing happens and no request is sent. It works in Chromium. Steps to reproduce: open any project in Firefox, click the checkmark. Tasklane 2.4.1, so I cannot complete any of my tasks.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P1, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: thank, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-05
+    category: bug
+    weight: 1
+    input:
+      number: 205
+      title: Sync fails with "invalid token" after about 24 hours and forces a logout
+      body: Every day my CLI and the web UI get an invalid token error and I am forced to log in again. Refreshing the token does not help. This started after the 2.4 upgrade.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P1, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: array_includes, path: labels, value: area:auth, weight: 1 }
+      - { type: regex, path: comment, pattern: reproduc, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-06
+    category: bug
+    weight: 1
+    input:
+      number: 206
+      title: Tasks created through the API with a due date in the past are silently dropped
+      body: 'POST /api/v1/tasks returns 201 but the task is never stored when due_date is earlier than today. No error is returned. Steps to reproduce: curl -X POST with {"title":"x","due_date":"2020-01-01"}, then GET /api/v1/tasks. Version 2.4.0.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P1, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: array_includes, path: labels, value: area:api, weight: 1 }
+      - { type: regex, path: comment, pattern: thank, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-07
+    category: bug
+    weight: 1
+    input:
+      number: 207
+      title: Progress bar overflows the card on narrow screens
+      body: On a phone-sized window the progress bar in the project card extends past the card border by a few pixels. Purely cosmetic, everything is still usable.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: reproduc, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-08
+    category: bug
+    weight: 1
+    input:
+      number: 208
+      title: Typo in the French translation of Settings > Notifications
+      body: '"Notifcations" is missing an "i" in the French locale. Same typo in the page title and in the sidebar.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: reproduc, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-09
+    category: bug
+    weight: 1
+    input:
+      number: 209
+      title: Filtering by label returns tasks from archived projects
+      body: 'When I filter the global task list by the label "billing", tasks from archived projects are included. Workaround: filter by project as well. Steps to reproduce: archive a project that has a labeled task, then filter by that label. Version 2.4.1.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: thank, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-10
+    category: bug
+    weight: 1
+    input:
+      number: 210
+      title: 'Task list is slow: loading 5,000 tasks takes 30 seconds'
+      body: With a workspace of about 5,000 tasks the list view takes roughly 30 seconds to render. Paginating by project is a workaround. The browser profile shows the time is spent in the frontend.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: array_includes, path: labels, value: area:performance, weight: 1 }
+      - { type: regex, path: comment, pattern: reproduc, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-11
+    category: bug
+    weight: 1
+    input:
+      number: 211
+      title: Tooltip text is cut off on the burndown chart
+      body: The tooltip for the last data point of the burndown chart is clipped on the right edge. Cosmetic issue.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: reproduc, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-12
+    category: bug
+    weight: 1
+    input:
+      number: 212
+      title: Wrong task count in the sidebar after a bulk delete
+      body: 'After selecting 20 tasks and deleting them, the sidebar still shows the old count until I refresh the page. Workaround: refresh. Steps to reproduce: select several tasks, press Delete, look at the sidebar counter. Version 2.4.1.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: thank, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-13
+    category: bug
+    weight: 1
+    input:
+      number: 213
+      title: Intermittent 502 from /api/v1/tasks under load
+      body: About one request in twenty to /api/v1/tasks returns 502 when more than ten clients sync at once. Our integration cannot complete a sync cycle and retries do not help.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P1, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: array_includes, path: labels, value: area:api, weight: 1 }
+      - { type: regex, path: comment, pattern: reproduc, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: bug-14
+    category: bug
+    weight: 1
+    input:
+      number: 214
+      title: Due time shifts by one hour when editing a task
+      body: 'Editing only the description of a task moves its due time one hour later. Workaround: set the time again after editing. Steps to reproduce: create a task due 09:00, edit its description, save. Tasklane 2.4.0 in Europe/Paris.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: bug, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: bug, weight: 1 }
+      - { type: regex, path: comment, pattern: thank, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-01
+    category: feature
+    weight: 1
+    input:
+      number: 215
+      title: Add a Slack integration for due-date reminders
+      body: It would be great to receive reminders in a Slack channel in addition to email. A webhook per project would be enough for our team.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-02
+    category: feature
+    weight: 1
+    input:
+      number: 216
+      title: Support recurring tasks on the last weekday of the month
+      body: Our invoicing task is due on the last working day of every month. The recurrence options only offer a fixed day number. Please add support for the last weekday.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-03
+    category: feature
+    weight: 1
+    input:
+      number: 217
+      title: Please add a compact view option for the task list
+      body: A denser list with smaller row height would let me see more tasks on a laptop screen.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-04
+    category: feature
+    weight: 1
+    input:
+      number: 218
+      title: Allow assigning multiple people to a task
+      body: Tasks currently accept a single assignee. Many of our tasks are shared between two people and we would like to assign both.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-05
+    category: feature
+    weight: 1
+    input:
+      number: 219
+      title: Add a dark blue theme option
+      body: 'Feature request: besides light and dark, a dark blue theme would be easier on the eyes for me.'
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-06
+    category: feature
+    weight: 1
+    input:
+      number: 220
+      title: Provide an official Helm chart
+      body: We deploy on Kubernetes and maintain our own chart. An official Helm chart would make upgrades and configuration much easier for everyone.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-07
+    category: feature
+    weight: 1
+    input:
+      number: 221
+      title: Ability to export a project as Markdown
+      body: I would like to export a project and its tasks as a Markdown checklist to paste into documents.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-08
+    category: feature
+    weight: 1
+    input:
+      number: 222
+      title: Serve an OpenAPI specification from the REST API
+      body: Please expose an OpenAPI document at /api/v1/openapi.json so that client libraries can be generated.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: array_includes, path: labels, value: area:api, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: feat-09
+    category: feature
+    weight: 1
+    input:
+      number: 223
+      title: Support SAML single sign-on
+      body: Our company requires SAML for every internal tool. Support for SAML single sign-on would allow us to adopt Tasklane.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: feature, weight: 3 }
+      - { type: exact, path: priority, expected: P2, weight: 2 }
+      - { type: array_includes, path: labels, value: enhancement, weight: 1 }
+      - { type: array_includes, path: labels, value: area:auth, weight: 1 }
+      - { type: regex, path: comment, pattern: enhancement|roadmap, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-01
+    category: question
+    weight: 1
+    input:
+      number: 224
+      title: How do I back up the SQLite database?
+      body: Is copying the data file while the server runs safe, or should I stop it first?
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-02
+    category: question
+    weight: 1
+    input:
+      number: 225
+      title: Is it possible to run Tasklane behind a reverse proxy under a sub-path?
+      body: I would like to serve it at https://example.org/tasks/ using nginx. Is there a base path setting?
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-03
+    category: question
+    weight: 1
+    input:
+      number: 226
+      title: What is the difference between archived and completed tasks?
+      body: The documentation uses both words. Do archived tasks still count in reports?
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-04
+    category: question
+    weight: 1
+    input:
+      number: 227
+      title: How can I use the CLI with a self-signed certificate?
+      body: tl login fails to verify the certificate of our internal server. Is there a flag to trust a custom CA?
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-05
+    category: question
+    weight: 1
+    input:
+      number: 228
+      title: Does the REST API support filtering by multiple labels?
+      body: I tried ?label=a&label=b but only the last one is applied. Is there a supported syntax?
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-06
+    category: question
+    weight: 1
+    input:
+      number: 229
+      title: Where are the logs stored in the Docker image?
+      body: I cannot find a log file inside the container. Are logs only written to stdout?
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-07
+    category: question
+    weight: 1
+    input:
+      number: 230
+      title: Can I change the default reminder time?
+      body: Reminders are sent at 09:00 by default. Is this configurable per user?
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: q-08
+    category: question
+    weight: 1
+    input:
+      number: 231
+      title: How to migrate from the v1 to the v2 configuration format?
+      body: The release notes mention a new configuration format but I could not find a migration guide.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: question, weight: 3 }
+      - { type: exact, path: priority, expected: P3, weight: 2 }
+      - { type: array_includes, path: labels, value: question, weight: 1 }
+      - { type: regex, path: comment, pattern: documentation, flags: i, weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-01
+    category: duplicate
+    weight: 1
+    input:
+      number: 232
+      title: HTTP 500 on the login page right after I reset my password
+      body: I used the reset link from the email, set a new password and now the login form answers with an HTTP 500 error.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 101, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#101\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-02
+    category: duplicate
+    weight: 1
+    input:
+      number: 233
+      title: tl sync never returns when the server is down
+      body: If the server is unreachable the CLI sync command just hangs. I have to press Ctrl+C.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 103, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#103\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-03
+    category: duplicate
+    weight: 1
+    input:
+      number: 234
+      title: CSV export is missing tasks that have a comma in their title
+      body: Exported 120 tasks but only 117 rows are in the file. The missing ones all have commas in the title.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 105, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#105\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-04
+    category: duplicate
+    weight: 1
+    input:
+      number: 235
+      title: Pagination cursor returns duplicate tasks when sorting by due date
+      body: Following the cursor of the previous page with sort=due_date gives duplicated or missing tasks on the next page.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 108, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#108\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-05
+    category: duplicate
+    weight: 1
+    input:
+      number: 236
+      title: OAuth state mismatch error when signing in with GitHub
+      body: Signing in with GitHub redirects back to the app with the error OAuth state mismatch, in every browser I tried.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 112, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#112\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-06
+    category: duplicate
+    weight: 1
+    input:
+      number: 237
+      title: File attachment upload fails when the file is bigger than 10 MB
+      body: Attaching a 15 MB file fails with a generic error. Smaller attachments are fine.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 113, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#113\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-07
+    category: duplicate
+    weight: 1
+    input:
+      number: 238
+      title: Container exits immediately if the DATABASE_URL has special characters
+      body: My database password contains an @ sign and the container stops at startup with a URL parse error.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 114, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#114\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-08
+    category: duplicate
+    weight: 1
+    input:
+      number: 239
+      title: Reminder emails use the server timezone, not the user timezone
+      body: Reminders arrive at the hour of the server instead of the hour of my profile timezone.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 116, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#116\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }
+  - id: dup-09
+    category: duplicate
+    weight: 1
+    input:
+      number: 240
+      title: Search does not match accented characters
+      body: Searching "cafe" does not find "Café menu". The search seems to be accent sensitive.
+    graders:
+      - { type: json_schema, weight: 1 }
+      - { type: exact, path: category, expected: duplicate, weight: 3 }
+      - { type: exact, path: duplicate_of, expected: 117, weight: 2 }
+      - { type: array_includes, path: labels, value: duplicate, weight: 1 }
+      - { type: regex, path: comment, pattern: "#117\\b", flags: '', weight: 1 }
+      - { type: tool_called, tool: search_similar_issues, weight: 1 }
+      - { type: tool_called, tool: add_labels, weight: 0.5 }
+      - { type: tool_called, tool: post_comment, weight: 0.5 }

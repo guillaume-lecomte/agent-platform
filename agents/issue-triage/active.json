@@ -7,6 +7,20 @@
       "previous": null,
       "at": "2026-10-06T00:00:00.000Z",
       "note": "Initial version"
+    },
+    {
+      "action": "promote",
+      "version": "v3",
+      "previous": "v1",
+      "at": "2026-10-06T10:47:48.388Z",
+      "note": "evals passed, overall 0.9691"
+    },
+    {
+      "action": "rollback",
+      "version": "v1",
+      "previous": "v3",
+      "at": "2026-10-06T10:47:59.548Z",
+      "note": "manual rollback"
     }
   ]
 }

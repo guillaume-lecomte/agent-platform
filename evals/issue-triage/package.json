@@ -1,0 +1,14 @@
+{
+  "name": "@agent-platform/evals-issue-triage",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Eval suite and baseline of the issue-triage agent. Depending on the agent and the eval tooling lets Turborepo run it only when one of them changes.",
+  "license": "MIT",
+  "scripts": {
+    "eval": "evals run --agent issue-triage --version active --summary-file reports/summary.md"
+  },
+  "dependencies": {
+    "@agent-platform/agent-issue-triage": "workspace:*",
+    "@agent-platform/evals": "workspace:*"
+  }
+}
