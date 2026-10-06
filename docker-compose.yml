@@ -46,6 +46,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   dashboard:
     build:
@@ -54,7 +60,8 @@ services:
     ports:
       - '8080:80'
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:
