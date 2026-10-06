@@ -1,5 +1,5 @@
 # Build context: repository root (see docker-compose.yml).
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
 WORKDIR /repo
@@ -11,7 +11,7 @@ RUN pnpm turbo run build --filter=@agent-platform/api...
 # Keep only production dependencies of the API, with workspace packages copied in.
 RUN pnpm --filter=@agent-platform/api --prod deploy --legacy /out
 
-FROM node:24-alpine AS runtime
+FROM node:26-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /out .
