@@ -17,6 +17,7 @@
   "dependencies": {
     "@agent-platform/agent-issue-triage": "workspace:*",
     "@agent-platform/core": "workspace:*",
+    "@agent-platform/cost-router": "workspace:*",
     "@agent-platform/durable-runner": "workspace:*",
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",

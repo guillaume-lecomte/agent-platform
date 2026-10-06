@@ -8,3 +8,6 @@ export const TASK_SERVICE = Symbol('TASK_SERVICE');
 export const RUNNER = Symbol('RUNNER');
 export const METRICS = Symbol('METRICS');
 export const AGENTS = Symbol('AGENTS');
+export const ROUTER = Symbol('ROUTER');
+export const COST_TRACKER = Symbol('COST_TRACKER');
+export const PRICING = Symbol('PRICING');

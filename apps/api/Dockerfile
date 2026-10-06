@@ -15,6 +15,8 @@ FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /out .
+# Pricing and routing policy, read at startup (CONFIG_DIR defaults to ./config).
+COPY --from=build /repo/config ./config
 EXPOSE 3000
 USER node
 CMD ["node", "dist/main.js"]

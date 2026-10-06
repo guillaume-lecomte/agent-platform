@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { CostsController } from './costs/costs.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { DomainExceptionFilter } from './http-exceptions.js';
 import { InfraModule } from './infra/infra.module.js';
@@ -17,6 +18,7 @@ import { TasksController } from './tasks/tasks.controller.js';
     EventsController,
     AgentsController,
     MetricsController,
+    CostsController,
   ],
   providers: [{ provide: APP_FILTER, useClass: DomainExceptionFilter }],
 })

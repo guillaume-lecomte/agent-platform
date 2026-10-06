@@ -1,5 +1,19 @@
 import { issueTriageResponder } from '@agent-platform/agent-issue-triage';
+import {
+  CompositeTracker,
+  CostRouter,
+  PgCallTracker,
+  RedisResponseCache,
+  RouterMetrics,
+  loadPolicy,
+  loadPricing,
+  migrateRouter,
+  mockLatencyFromPricing,
+  type PricingTable,
+  type QueryableTracker,
+} from '@agent-platform/cost-router';
 import { createProvider, type Config, type DbHandle, type Logger } from '@agent-platform/core';
+import { join, resolve } from 'node:path';
 import {
   AgentRunner,
   PgTaskStore,
@@ -23,9 +37,12 @@ import {
   AGENTS,
   BUS,
   CONFIG,
+  COST_TRACKER,
   DB,
   LOGGER,
   METRICS,
+  PRICING,
+  ROUTER,
   RUNNER,
   STORE,
   TASK_SERVICE,
@@ -64,14 +81,53 @@ const WORKER = Symbol('WORKER');
       useFactory: (store: TaskStore) => new MetricsService(store),
     },
     {
+      provide: PRICING,
+      inject: [CONFIG],
+      useFactory: (c: Config): Promise<PricingTable> =>
+        loadPricing(resolve(c.CONFIG_DIR, 'pricing.yaml')),
+    },
+    {
+      provide: COST_TRACKER,
+      inject: [DB],
+      useFactory: (db: DbHandle): QueryableTracker => new PgCallTracker(db.db),
+    },
+    {
+      provide: ROUTER,
+      inject: [CONFIG, PRICING, COST_TRACKER, METRICS, LOGGER],
+      useFactory: async (
+        c: Config,
+        pricing: PricingTable,
+        tracker: QueryableTracker,
+        metrics: MetricsService,
+        logger: Logger,
+      ) => {
+        const policy = await loadPolicy(join(resolve(c.CONFIG_DIR), c.ROUTER_POLICY));
+        // One real or mock provider; the router picks the model per request.
+        const base = createProvider(c, {
+          mockResponder: issueTriageResponder,
+          mockSimulatedLatency: mockLatencyFromPricing(pricing),
+        });
+        return new CostRouter({
+          providers: { [c.LLM_PROVIDER]: base },
+          pricing,
+          policy,
+          cache: new RedisResponseCache(c.REDIS_URL),
+          tracker: new CompositeTracker([tracker, new RouterMetrics(metrics.registry)], (err) =>
+            logger.warn({ err: String(err) }, 'cost tracking failed'),
+          ),
+          logger,
+        });
+      },
+    },
+    {
       provide: RUNNER,
-      inject: [STORE, BUS, AGENTS, LOGGER, CONFIG, METRICS],
+      inject: [STORE, BUS, AGENTS, LOGGER, ROUTER, METRICS],
       useFactory: (
         store: TaskStore,
         bus: EventBus,
         agents: AgentCatalog,
         logger: Logger,
-        config: Config,
+        router: CostRouter,
         metrics: MetricsService,
       ) =>
         new AgentRunner({
@@ -79,7 +135,7 @@ const WORKER = Symbol('WORKER');
           bus,
           logger,
           resolver: agents.resolver,
-          provider: createProvider(config, { mockResponder: issueTriageResponder }),
+          provider: router,
           hooks: metrics.hooks,
         }),
     },
@@ -116,7 +172,7 @@ const WORKER = Symbol('WORKER');
         }),
     },
   ],
-  exports: [STORE, BUS, AGENTS, METRICS, RUNNER, TASK_SERVICE],
+  exports: [STORE, BUS, AGENTS, METRICS, RUNNER, TASK_SERVICE, ROUTER, COST_TRACKER, PRICING],
 })
 export class RunnerModule implements OnApplicationBootstrap, OnApplicationShutdown {
   constructor(
@@ -130,6 +186,7 @@ export class RunnerModule implements OnApplicationBootstrap, OnApplicationShutdo
 
   async onApplicationBootstrap(): Promise<void> {
     await migrateRunner(this.db.db);
+    await migrateRouter(this.db.db);
     const woken = await this.service.reconcile();
     if (woken > 0) this.logger.info({ woken }, 'reconciled tasks with a lost wake-up');
   }

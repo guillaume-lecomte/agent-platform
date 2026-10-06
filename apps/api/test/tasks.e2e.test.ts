@@ -6,6 +6,15 @@ import {
 } from '@agent-platform/agent-issue-triage';
 import { MockProvider, createLogger } from '@agent-platform/core';
 import {
+  CostRouter,
+  InMemoryCallTracker,
+  InMemoryResponseCache,
+  loadPolicy,
+  loadPricing,
+  mockLatencyFromPricing,
+} from '@agent-platform/cost-router';
+import { fileURLToPath } from 'node:url';
+import {
   AgentRunner,
   InMemoryEventBus,
   InMemoryTaskStore,
@@ -18,7 +27,8 @@ import { APP_FILTER } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DomainExceptionFilter } from '../src/http-exceptions.js';
-import { AGENTS, BUS, METRICS, TASK_SERVICE } from '../src/infra/tokens.js';
+import { AGENTS, BUS, COST_TRACKER, METRICS, PRICING, TASK_SERVICE } from '../src/infra/tokens.js';
+import { CostsController } from '../src/costs/costs.controller.js';
 import { MetricsService } from '../src/metrics/metrics.service.js';
 import { AgentsController } from '../src/tasks/agents.controller.js';
 import { EventsController } from '../src/tasks/events.controller.js';
@@ -44,12 +54,28 @@ async function startApp() {
     },
     activeVersion: async () => 'v1',
   };
+  const config = (file: string) =>
+    fileURLToPath(new URL(`../../../config/${file}`, import.meta.url));
+  const pricing = await loadPricing(config('pricing.yaml'));
+  const tracker = new InMemoryCallTracker();
+  const router = new CostRouter({
+    providers: {
+      mock: new MockProvider({
+        responder: issueTriageResponder,
+        simulatedLatencyMs: mockLatencyFromPricing(pricing),
+      }),
+    },
+    pricing,
+    policy: await loadPolicy(config('routing.yaml')),
+    cache: new InMemoryResponseCache(),
+    tracker,
+  });
   const runner = new AgentRunner({
     store,
     bus,
     logger,
     resolver: catalog.resolver,
-    provider: new MockProvider({ responder: issueTriageResponder }),
+    provider: router,
     hooks: metrics.hooks,
   });
   // Runs jobs inline, in the background, like a worker would.
@@ -68,18 +94,26 @@ async function startApp() {
     runner,
   });
   const moduleRef = await Test.createTestingModule({
-    controllers: [TasksController, EventsController, AgentsController, MetricsController],
+    controllers: [
+      TasksController,
+      EventsController,
+      AgentsController,
+      MetricsController,
+      CostsController,
+    ],
     providers: [
       { provide: TASK_SERVICE, useValue: service },
       { provide: BUS, useValue: bus },
       { provide: AGENTS, useValue: catalog },
       { provide: METRICS, useValue: metrics },
+      { provide: COST_TRACKER, useValue: tracker },
+      { provide: PRICING, useValue: pricing },
       { provide: APP_FILTER, useClass: DomainExceptionFilter },
     ],
   }).compile();
   const app = moduleRef.createNestApplication();
   await app.listen(0);
-  return { app, url: await app.getUrl(), effects };
+  return { app, url: await app.getUrl(), effects, tracker };
 }
 
 async function waitFor<T>(fn: () => Promise<T | undefined>, ms = 5000): Promise<T> {
@@ -257,5 +291,46 @@ describe('REST API', () => {
     expect(text).toContain('task.created');
     expect(text).toContain('task.started');
     expect(text).toContain('task.awaiting_approval');
+  });
+
+  it('routes by input size and reports cost and latency per model, flagged as simulated', async () => {
+    const started = await startApp();
+    app = started.app;
+    const short = { title: 'Typo in settings', body: 'Notifcations is missing an i.' };
+    const long = {
+      title: 'Sync fails after upgrade',
+      body: 'We upgraded last week. '.repeat(20) + 'Now sync fails every time. Version 2.4.1.',
+    };
+    for (const input of [short, long]) {
+      const { body: task } = await call(started.url, '/tasks', 'POST', { input });
+      for (let i = 0; i < 2; i++) {
+        const a = await waitFor(
+          async () =>
+            (
+              (await call(started.url, `/approvals?status=pending&taskId=${task.id}`))
+                .body as Json[]
+            )[0],
+        );
+        await call(started.url, `/approvals/${a.id}/approve`, 'POST', {});
+      }
+      await waitFor(async () =>
+        (await call(started.url, `/tasks/${task.id}`)).body.state === 'completed'
+          ? true
+          : undefined,
+      );
+    }
+    const costs = (await call(started.url, '/costs')).body;
+    expect(costs.simulated).toBe(true);
+    expect(costs.byModel.map((m: Json) => m.model).sort()).toEqual(['mock-large', 'mock-small']);
+    expect(costs.totals.calls).toBe(8); // 4 model calls per task
+    expect(costs.totals.costUsd).toBeGreaterThan(0);
+    expect(costs.byModel[0].p50LatencyMs).toBeGreaterThan(0);
+    expect(costs.pricing.models.find((m: Json) => m.model === 'mock-large')).toMatchObject({
+      simulated: true,
+      retrieved: '2026-10-06',
+    });
+    const calls = (await call(started.url, '/costs/calls?limit=10')).body as Json[];
+    expect(calls.some((c) => c.rule === 'simple-triage-on-small-model')).toBe(true);
+    expect(calls.every((c) => c.taskId)).toBe(true);
   });
 });
