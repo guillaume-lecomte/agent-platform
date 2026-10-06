@@ -101,7 +101,7 @@ jobs:
       - name: Comment eval summary on the pull request
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.summaries.outputs.found == 'true' }}
         continue-on-error: true # forks get a read-only token
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
