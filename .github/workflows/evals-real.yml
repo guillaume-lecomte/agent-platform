@@ -46,7 +46,7 @@ jobs:
         if: steps.secret.outputs.present == 'true'
       - run: corepack enable
         if: steps.secret.outputs.present == 'true'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.secret.outputs.present == 'true'
         with:
           node-version-file: .nvmrc
