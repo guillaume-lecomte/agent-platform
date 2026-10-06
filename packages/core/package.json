@@ -1,0 +1,42 @@
+{
+  "name": "@agent-platform/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared types, LLM provider and tool interfaces, mock provider, config and logger.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "ajv": "^8.20.0",
+    "drizzle-orm": "^0.45.3",
+    "openai": "^7.28.0",
+    "pg": "^8.23.1",
+    "pino": "catalog:",
+    "yaml": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.15.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
