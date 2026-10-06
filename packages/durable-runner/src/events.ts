@@ -1,5 +1,6 @@
+import type { Logger } from '@agent-platform/core';
 import { Redis } from 'ioredis';
-import type { TaskEvent } from './types.js';
+import type { TaskEvent, TaskEventType } from './types.js';
 
 export type EventHandler = (event: TaskEvent) => void;
 
@@ -8,6 +9,21 @@ export interface EventBus {
   /** Returns an unsubscribe function. */
   subscribe(handler: EventHandler): () => void;
   close(): Promise<void>;
+}
+
+/** Publishes a lifecycle event. A broken bus is logged, never allowed to fail the task. */
+export async function publishEvent(
+  bus: EventBus,
+  logger: Logger,
+  type: TaskEventType,
+  taskId: string,
+  data?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await bus.publish({ type, taskId, at: new Date().toISOString(), data });
+  } catch (err) {
+    logger.warn({ err: String(err), type }, 'failed to publish event');
+  }
 }
 
 export class InMemoryEventBus implements EventBus {

@@ -9,19 +9,25 @@ import {
   type AnyTool,
   type LLMProvider,
   type LLMRequest,
+  type LLMResponse,
   type Logger,
   type ToolSpec,
 } from '@agent-platform/core';
 import { NotFoundError, StepConflictError } from './errors.js';
-import type { EventBus } from './events.js';
-import { buildMessages, defaultRenderInput, lastLlmStep, pendingToolCalls } from './messages.js';
+import { publishEvent, type EventBus } from './events.js';
+import {
+  buildMessages,
+  defaultRenderInput,
+  lastLlmStep,
+  pendingToolCalls,
+  type PendingToolCall,
+} from './messages.js';
 import { retryTransient, type RetryOptions } from './retry.js';
 import type { TaskStore } from './store.js';
 import {
   isTerminal,
   type AgentTask,
-  type LlmStepPayload,
-  type TaskEvent,
+  type TaskStep,
   type TaskEventType,
   type TaskState,
   type ToolOutcome,
@@ -61,17 +67,28 @@ export interface AdvanceResult {
   state: TaskState;
 }
 
+/** What the loop needs about one run of one task, computed once. */
+interface Run {
+  taskId: string;
+  runtime: AgentRuntime;
+  tools: Map<string, AnyTool>;
+  allowed: Set<string>;
+  toolSpecs: ToolSpec[];
+  firstMessage: string;
+  signal: AbortSignal;
+  log: Logger;
+}
+
 /**
- * Advances an agent task as far as it can go: until it finishes, needs a human
- * approval, or is stopped. It is safe to call again at any time: all progress lives
- * in the store, so a call after a crash continues from the last checkpoint.
+ * Advances a task until it finishes, needs a human approval, or is stopped. All progress lives
+ * in the store, so calling it again (after a crash, an approval...) continues from the last step.
  */
 export class AgentRunner {
   private readonly controllers = new Map<string, AbortController>();
 
   constructor(private readonly deps: RunnerDeps) {}
 
-  /** Aborts the in-flight LLM call of a task running in this process, if any. */
+  /** Aborts the in-flight model call of a task running in this process, if any. */
   abortLocal(taskId: string): void {
     this.controllers.get(taskId)?.abort();
   }
@@ -80,7 +97,7 @@ export class AgentRunner {
     const { store } = this.deps;
     const task = await store.getTask(taskId);
     if (!task) throw new NotFoundError('task', taskId);
-    // Terminal tasks are done; awaiting_approval tasks only move through the approval flow.
+    // awaiting_approval tasks only move through the approval flow.
     if (isTerminal(task.state) || task.state === 'awaiting_approval') {
       return { state: task.state };
     }
@@ -90,20 +107,33 @@ export class AgentRunner {
     const controller = new AbortController();
     this.controllers.set(taskId, controller);
     try {
-      const steps = await store.listSteps(taskId);
+      const stepCount = (await store.listSteps(taskId)).length;
       const started = await store.transition(taskId, ['pending', 'running'], 'running');
       if (!started) return { state: (await store.getTask(taskId))?.state ?? task.state };
-      await this.emit(
-        ('task.' + (steps.length === 0 ? 'started' : 'resumed')) as TaskEventType,
+      await this.emit(stepCount === 0 ? 'task.started' : 'task.resumed', taskId, {
+        steps: stepCount,
+      });
+
+      const allowed = new Set(runtime.definition.tools);
+      const run: Run = {
         taskId,
-        {
-          steps: steps.length,
-        },
-      );
-      const state = await this.loop(started, runtime, controller.signal, log);
-      return { state };
+        runtime,
+        tools: new Map(runtime.tools.map((t) => [t.name, t])),
+        allowed,
+        toolSpecs: runtime.tools
+          .filter((t) => allowed.has(t.name))
+          .map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
+        firstMessage: (runtime.renderInput ?? defaultRenderInput)(started.input),
+        signal: controller.signal,
+        log,
+      };
+      for (;;) {
+        const state = await this.iterate(run);
+        if (state) return { state };
+      }
     } catch (err) {
       if (err instanceof StepConflictError) {
+        // Another worker wrote the step we were about to write: let it carry on.
         log.warn({ err: err.message }, 'task is being advanced by another worker; stopping');
         return { state: (await store.getTask(taskId))?.state ?? 'running' };
       }
@@ -113,187 +143,153 @@ export class AgentRunner {
     }
   }
 
-  private async loop(
-    initial: AgentTask,
-    runtime: AgentRuntime,
-    signal: AbortSignal,
-    log: Logger,
-  ): Promise<TaskState> {
-    const { store, provider } = this.deps;
-    const { definition } = runtime;
-    const taskId = initial.id;
-    const toolsByName = new Map(runtime.tools.map((t) => [t.name, t]));
-    const allowed = new Set(definition.tools);
-    const toolSpecs: ToolSpec[] = runtime.tools
-      .filter((t) => allowed.has(t.name))
-      .map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
-    const rendered = (runtime.renderInput ?? defaultRenderInput)(initial.input);
+  /** One pass of the loop. Returns the state to stop in, or undefined to go around again. */
+  private async iterate(run: Run): Promise<TaskState | undefined> {
+    const { store } = this.deps;
+    const task = await store.getTask(run.taskId);
+    if (!task) throw new NotFoundError('task', run.taskId);
+    if (task.cancelRequested || task.state === 'cancelled') {
+      return this.finish(task, 'cancelled', {}, 'task.cancelled');
+    }
+    const steps = await store.listSteps(run.taskId);
+    const pending = pendingToolCalls(steps);
+    const last = lastLlmStep(steps);
 
-    for (;;) {
-      const task = await store.getTask(taskId);
-      if (!task) throw new NotFoundError('task', taskId);
-      if (task.cancelRequested || task.state === 'cancelled') {
-        return this.finish(task, 'cancelled', {}, 'task.cancelled');
-      }
-      const steps = await store.listSteps(taskId);
+    // The last model turn asked for nothing more: that is the answer.
+    if (pending.length === 0 && last && last.payload.toolCalls.length === 0) {
+      const text = last.payload.content;
+      return this.finish(
+        task,
+        'completed',
+        { result: { text, json: tryParseJson(text) } },
+        'task.completed',
+      );
+    }
 
-      // 1. Tool calls requested by the model and not yet answered.
-      const pending = pendingToolCalls(steps);
-      const last = lastLlmStep(steps);
+    // Once the budget is gone, nothing new starts: neither a model call nor a tool call.
+    if (task.tokensUsed >= task.tokenBudget) {
+      return this.finish(
+        task,
+        'budget_exceeded',
+        { error: `Token budget of ${task.tokenBudget} reached (${task.tokensUsed} used)` },
+        'task.budget_exceeded',
+      );
+    }
 
-      if (pending.length === 0 && last && last.payload.toolCalls.length === 0) {
-        const text = last.payload.content;
-        return this.finish(
-          task,
-          'completed',
-          { result: { text, json: tryParseJson(text) } },
-          'task.completed',
-        );
-      }
+    // Tool calls run one at a time; each result is a step, and the loop re-reads the log
+    // (cancellation, budget) before the next one.
+    const next = pending[0];
+    if (next) {
+      const suspended = await this.runToolCall(run, task, next, steps.length + 1);
+      return suspended ? 'awaiting_approval' : undefined;
+    }
+    return this.callModel(run, task, steps);
+  }
 
-      // 2. Budget gate: never start new work (a model call, or a tool call) once exhausted.
-      if (task.tokensUsed >= task.tokenBudget) {
-        return this.finish(
-          task,
-          'budget_exceeded',
-          { error: `Token budget of ${task.tokenBudget} reached (${task.tokensUsed} used)` },
-          'task.budget_exceeded',
-        );
-      }
+  private async callModel(
+    run: Run,
+    task: AgentTask,
+    steps: TaskStep[],
+  ): Promise<TaskState | undefined> {
+    const { store } = this.deps;
+    const { definition } = run.runtime;
 
-      const next = pending[0];
-      if (next) {
-        // One tool call per iteration: each result is a new step, and the loop reloads
-        // the log (cancellation, budget) before the next one.
-        const suspended = await this.handleToolCall(
-          task,
-          next,
-          steps.length,
-          toolsByName,
-          allowed,
-          log,
-          signal,
-        );
-        if (suspended) return 'awaiting_approval';
-        continue;
-      }
+    if (steps.filter((s) => s.kind === 'llm').length >= definition.maxSteps) {
+      return this.finish(
+        task,
+        'failed',
+        { error: `Exceeded maxSteps (${definition.maxSteps})` },
+        'task.failed',
+      );
+    }
+    const messages = buildMessages(definition, run.firstMessage, steps);
+    const estimate = estimateInputTokens(messages, run.toolSpecs);
+    const remaining = task.tokenBudget - task.tokensUsed;
+    if (estimate > remaining) {
+      return this.finish(
+        task,
+        'budget_exceeded',
+        { error: `Next call needs about ${estimate} input tokens; ${remaining} left in budget` },
+        'task.budget_exceeded',
+      );
+    }
 
-      // 3. A new model call.
-      const llmCalls = steps.filter((s) => s.kind === 'llm').length;
-      if (llmCalls >= definition.maxSteps) {
-        return this.finish(
-          task,
-          'failed',
-          { error: `Exceeded maxSteps (${definition.maxSteps})` },
-          'task.failed',
-        );
-      }
-      const messages = buildMessages(definition, rendered, steps);
-      const estimate = estimateInputTokens(messages, toolSpecs);
-      if (task.tokensUsed + estimate > task.tokenBudget) {
-        return this.finish(
-          task,
-          'budget_exceeded',
-          {
-            error: `Next call needs about ${estimate} input tokens; ${task.tokenBudget - task.tokensUsed} left in budget`,
+    const request: LLMRequest = {
+      messages,
+      signal: run.signal,
+      tools: run.toolSpecs.length > 0 ? run.toolSpecs : undefined,
+      model: definition.model,
+      hints: definition.routing,
+      metadata: { taskId: task.id, agentId: task.agentId, agentVersion: task.agentVersion },
+    };
+
+    let response: LLMResponse;
+    try {
+      response = await retryTransient(
+        () =>
+          withSpan('llm.complete', { 'task.id': task.id, 'agent.id': task.agentId }, () =>
+            this.deps.provider.complete(request),
+          ),
+        {
+          ...this.deps.retry,
+          signal: run.signal,
+          onRetry: ({ attempt, delayMs, error }) => {
+            run.log.warn({ attempt, delayMs, kind: error.kind }, 'transient LLM error, retrying');
+            this.deps.hooks?.onLlmRetry?.({ taskId: task.id, attempt, delayMs, kind: error.kind });
+            void this.emit('task.retry', task.id, { attempt, delayMs, kind: error.kind });
           },
-          'task.budget_exceeded',
-        );
+        },
+      );
+    } catch (err) {
+      if (!(err instanceof LLMError)) throw err;
+      if (err.kind === 'aborted') {
+        const fresh = await store.getTask(task.id);
+        if (fresh) return this.finish(fresh, 'cancelled', {}, 'task.cancelled');
       }
+      run.log.error({ kind: err.kind, retryable: err.retryable }, 'LLM call failed');
+      const exhausted = err.retryable ? ', retries exhausted' : '';
+      return this.finish(
+        task,
+        'failed',
+        { error: `LLM error (${err.kind}${exhausted}): ${err.message}` },
+        'task.failed',
+      );
+    }
 
-      const request: LLMRequest = {
-        messages,
-        signal,
-        metadata: { taskId, agentId: task.agentId, agentVersion: task.agentVersion },
-        ...(toolSpecs.length > 0 ? { tools: toolSpecs } : {}),
-        ...(definition.model ? { model: definition.model } : {}),
-        ...(definition.routing
-          ? {
-              hints: {
-                taskType: definition.routing.taskType,
-                ...(definition.routing.complexity
-                  ? { complexity: definition.routing.complexity }
-                  : {}),
-              },
-            }
-          : {}),
-      };
-
-      let response;
-      try {
-        response = await retryTransient(
-          () =>
-            withSpan('llm.complete', { 'task.id': taskId, 'agent.id': task.agentId }, () =>
-              provider.complete(request),
-            ),
-          {
-            ...this.deps.retry,
-            signal,
-            onRetry: ({ attempt, delayMs, error }) => {
-              log.warn({ attempt, delayMs, kind: error.kind }, 'transient LLM error, retrying');
-              this.deps.hooks?.onLlmRetry?.({ taskId, attempt, delayMs, kind: error.kind });
-              void this.emit('task.retry', taskId, { attempt, delayMs, kind: error.kind });
-            },
-          },
-        );
-      } catch (err) {
-        if (err instanceof LLMError) {
-          const fresh = await store.getTask(taskId);
-          if (err.kind === 'aborted' && fresh) {
-            return this.finish(fresh, 'cancelled', {}, 'task.cancelled');
-          }
-          log.error({ kind: err.kind, retryable: err.retryable }, 'LLM call failed');
-          return this.finish(
-            task,
-            'failed',
-            {
-              error: `LLM error (${err.kind}${err.retryable ? ', retries exhausted' : ''}): ${err.message}`,
-            },
-            'task.failed',
-          );
-        }
-        throw err;
-      }
-
-      const payload: LlmStepPayload = {
+    const step = await store.appendStep(task.id, steps.length + 1, {
+      kind: 'llm',
+      payload: {
         content: response.content,
         toolCalls: response.toolCalls,
         model: response.model,
         latencyMs: response.latencyMs,
         simulated: response.simulated,
-        ...(response.cached ? { cached: true } : {}),
-      };
-      const step = await store.appendStep(taskId, steps.length + 1, {
-        kind: 'llm',
-        payload,
-        inputTokens: response.usage.inputTokens,
-        outputTokens: response.usage.outputTokens,
-      });
-      await this.emit('task.step', taskId, {
-        seq: step.seq,
-        kind: 'llm',
-        model: response.model,
-        toolCalls: response.toolCalls.map((c) => c.name),
-        tokens: response.usage.inputTokens + response.usage.outputTokens,
-      });
-    }
+        cached: response.cached,
+      },
+      inputTokens: response.usage.inputTokens,
+      outputTokens: response.usage.outputTokens,
+    });
+    await this.emit('task.step', task.id, {
+      seq: step.seq,
+      kind: 'llm',
+      model: response.model,
+      toolCalls: response.toolCalls.map((c) => c.name),
+      tokens: response.usage.inputTokens + response.usage.outputTokens,
+    });
+    return undefined;
   }
 
-  /** Returns true when the task was suspended to wait for a human. */
-  private async handleToolCall(
+  /**
+   * Handles one tool call requested by the model, and records its result as the next step.
+   * Returns true when the task was suspended to wait for a human.
+   */
+  private async runToolCall(
+    run: Run,
     task: AgentTask,
-    pending: {
-      call: { id: string; name: string; arguments: Record<string, unknown> };
-      stepSeq: number;
-    },
-    stepCount: number,
-    toolsByName: Map<string, AnyTool>,
-    allowed: Set<string>,
-    log: Logger,
-    signal: AbortSignal,
+    { call, stepSeq }: PendingToolCall,
+    nextSeq: number,
   ): Promise<boolean> {
     const { store } = this.deps;
-    const { call, stepSeq } = pending;
     const record = async (
       content: string,
       isError: boolean,
@@ -307,7 +303,7 @@ export class AgentRunner {
         isError,
         outcome,
       };
-      const step = await store.appendStep(task.id, stepCount + 1, { kind: 'tool', payload });
+      const step = await store.appendStep(task.id, nextSeq, { kind: 'tool', payload });
       this.deps.hooks?.onToolCall?.({ taskId: task.id, tool: call.name, outcome });
       await this.emit('task.step', task.id, {
         seq: step.seq,
@@ -318,8 +314,8 @@ export class AgentRunner {
       });
     };
 
-    const tool = toolsByName.get(call.name);
-    if (!tool || !allowed.has(call.name)) {
+    const tool = run.tools.get(call.name);
+    if (!tool || !run.allowed.has(call.name)) {
       await record(`Unknown tool "${call.name}"`, true, 'rejected');
       return false;
     }
@@ -329,7 +325,6 @@ export class AgentRunner {
       return false;
     }
 
-    // Human approval for anything with an effect.
     if (tool.risk !== 'read') {
       const approval =
         (await store.findApproval(task.id, stepSeq, call.id)) ??
@@ -353,8 +348,9 @@ export class AgentRunner {
         return true;
       }
       if (approval.status === 'denied') {
+        const why = approval.reason ? `: ${approval.reason}` : '.';
         await record(
-          `The call was declined by a human reviewer${approval.reason ? `: ${approval.reason}` : '.'} Do not retry it.`,
+          `The call was declined by a human reviewer${why} Do not retry it.`,
           true,
           'denied',
         );
@@ -374,9 +370,9 @@ export class AgentRunner {
         return false;
       }
       if (tool.risk !== 'read') {
-        // Started, never completed: a previous run may have performed the effect.
-        // At-most-once is the safe choice; the agent is told the outcome is unknown.
-        log.warn({ tool: tool.name }, 'tool execution was interrupted earlier; not re-running');
+        // Registered but never completed: the effect may or may not have happened. Running it
+        // again could repeat it, so tell the agent instead (ADR 0005).
+        run.log.warn({ tool: tool.name }, 'tool execution was interrupted earlier; not re-running');
         await record(
           'A previous attempt of this call was interrupted and its outcome is unknown. It was not re-executed. Verify the current state before deciding whether to retry.',
           true,
@@ -384,7 +380,7 @@ export class AgentRunner {
         );
         return false;
       }
-      // read tools are safe to run again; fall through
+      // A read tool is safe to run again.
     }
 
     let content: string;
@@ -397,8 +393,8 @@ export class AgentRunner {
           tool.execute(call.arguments, {
             taskId: task.id,
             idempotencyKey: `${key.taskId}:${key.stepSeq}:${key.argsHash}`,
-            signal,
-            logger: log,
+            signal: run.signal,
+            logger: run.log,
           }),
       );
       content = typeof output === 'string' ? output : JSON.stringify(output);
@@ -417,35 +413,22 @@ export class AgentRunner {
     patch: { result?: unknown; error?: string },
     event: TaskEventType,
   ): Promise<TaskState> {
-    const updated = await this.deps.store.transition(
+    const { store, logger, hooks } = this.deps;
+    const updated = await store.transition(
       task.id,
       ['pending', 'running', 'awaiting_approval'],
       state,
       patch,
     );
-    if (!updated) return (await this.deps.store.getTask(task.id))?.state ?? state;
-    this.deps.logger.info({ taskId: task.id, state }, 'task finished');
-    this.deps.hooks?.onTaskFinished?.(updated, state);
-    await this.emit(event, task.id, { state, ...(patch.error ? { error: patch.error } : {}) });
+    if (!updated) return (await store.getTask(task.id))?.state ?? state;
+    logger.info({ taskId: task.id, state }, 'task finished');
+    hooks?.onTaskFinished?.(updated, state);
+    await this.emit(event, task.id, { state, error: patch.error });
     return state;
   }
 
-  private async emit(
-    type: TaskEventType,
-    taskId: string,
-    data?: Record<string, unknown>,
-  ): Promise<void> {
-    const event: TaskEvent = {
-      type,
-      taskId,
-      at: new Date().toISOString(),
-      ...(data ? { data } : {}),
-    };
-    try {
-      await this.deps.bus.publish(event);
-    } catch (err) {
-      this.deps.logger.warn({ err: String(err), type }, 'failed to publish event');
-    }
+  private emit(type: TaskEventType, taskId: string, data?: Record<string, unknown>): Promise<void> {
+    return publishEvent(this.deps.bus, this.deps.logger, type, taskId, data);
   }
 }
 

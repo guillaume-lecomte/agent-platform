@@ -1,7 +1,7 @@
 import type { Logger } from '@agent-platform/core';
 import { randomUUID } from 'node:crypto';
 import { ConflictError, NotFoundError } from './errors.js';
-import type { EventBus } from './events.js';
+import { publishEvent, type EventBus } from './events.js';
 import type { AgentResolver, AgentRunner } from './runner.js';
 import type { TaskScheduler } from './queue.js';
 import type { TaskStore } from './store.js';
@@ -9,7 +9,6 @@ import {
   isTerminal,
   type AgentTask,
   type Approval,
-  type TaskEvent,
   type TaskEventType,
   type TaskStep,
 } from './types.js';
@@ -144,21 +143,7 @@ export class TaskService {
     return decided;
   }
 
-  private async emit(
-    type: TaskEventType,
-    taskId: string,
-    data?: Record<string, unknown>,
-  ): Promise<void> {
-    const event: TaskEvent = {
-      type,
-      taskId,
-      at: new Date().toISOString(),
-      ...(data ? { data } : {}),
-    };
-    try {
-      await this.deps.bus.publish(event);
-    } catch (err) {
-      this.deps.logger.warn({ err: String(err), type }, 'failed to publish event');
-    }
+  private emit(type: TaskEventType, taskId: string, data?: Record<string, unknown>): Promise<void> {
+    return publishEvent(this.deps.bus, this.deps.logger, type, taskId, data);
   }
 }
