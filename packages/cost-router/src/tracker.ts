@@ -142,8 +142,8 @@ function toRecord(r: typeof llmCalls.$inferSelect): CallRecord {
   return {
     id: r.id,
     at: new Date(r.at).toISOString(),
-    ...(r.taskId ? { taskId: r.taskId } : {}),
-    ...(r.agentId ? { agentId: r.agentId } : {}),
+    taskId: r.taskId ?? undefined,
+    agentId: r.agentId ?? undefined,
     model: r.model,
     provider: r.provider,
     rule: r.rule,
@@ -155,9 +155,9 @@ function toRecord(r: typeof llmCalls.$inferSelect): CallRecord {
     latencyMs: r.latencyMs,
     simulated: r.simulated,
     cacheHit: r.cacheHit,
-    ...(r.fallbackFrom ? { fallbackFrom: r.fallbackFrom } : {}),
+    fallbackFrom: r.fallbackFrom ?? undefined,
     status: r.status as CallRecord['status'],
-    ...(r.error ? { error: r.error } : {}),
+    error: r.error ?? undefined,
   };
 }
 

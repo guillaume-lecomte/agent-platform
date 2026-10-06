@@ -45,8 +45,8 @@ export class TasksController {
     const { task, created } = await this.service.createTask({
       agentId: parsed.agentId,
       input: parsed.input,
-      ...(parsed.agentVersion ? { agentVersion: parsed.agentVersion } : {}),
-      ...(parsed.tokenBudget ? { tokenBudget: parsed.tokenBudget } : {}),
+      agentVersion: parsed.agentVersion,
+      tokenBudget: parsed.tokenBudget,
       ...((parsed.idempotencyKey ?? headerKey)
         ? { idempotencyKey: (parsed.idempotencyKey ?? headerKey)! }
         : {}),
@@ -80,7 +80,7 @@ export class TasksController {
   approvals(@Query('status') status?: string, @Query('taskId') taskId?: string) {
     const parsed = z.enum(['pending', 'approved', 'denied']).optional().parse(status);
     return this.service.listApprovals({
-      ...(parsed ? { status: parsed } : {}),
+      status: parsed,
       ...(taskId ? { taskId } : {}),
     });
   }

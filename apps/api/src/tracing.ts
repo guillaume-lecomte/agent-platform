@@ -1,9 +1,4 @@
-/**
- * Optional OpenTelemetry export. Tracing is off unless OTEL_EXPORTER_OTLP_ENDPOINT is set;
- * the SDK is then loaded lazily so a default run pays nothing for it.
- * Spans: `llm.complete` and `tool.execute` (see durable-runner), nested under HTTP spans when
- * instrumentation is available.
- */
+/** Optional OpenTelemetry export, off unless OTEL_EXPORTER_OTLP_ENDPOINT is set (the SDK is then loaded lazily). */
 export async function startTracing(
   endpoint: string | undefined,
   serviceName = 'agent-platform-api',

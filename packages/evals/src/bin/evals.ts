@@ -50,8 +50,8 @@ async function main(): Promise<number> {
     const result = await evaluateVersion({
       agentId: values.agent,
       version: values.version,
-      ...(values.baseline ? { baselinePath: values.baseline } : {}),
-      ...(values.out ? { outDir: values.out } : {}),
+      baselinePath: values.baseline,
+      outDir: values.out,
       gateOverrides: {
         ...(values['max-overall-drop']
           ? { max_overall_drop: Number(values['max-overall-drop']) }

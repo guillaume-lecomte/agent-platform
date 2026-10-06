@@ -76,7 +76,7 @@ export class CostRouter implements LLMProvider {
           cacheHit: false,
           costUsd,
           savedUsd: 0,
-          ...(failedModel ? { fallbackFrom: failedModel } : {}),
+          fallbackFrom: failedModel,
         });
         if (useCache) {
           await this.safeCacheSet(
@@ -95,7 +95,7 @@ export class CostRouter implements LLMProvider {
           costUsd: null,
           savedUsd: 0,
           error,
-          ...(failedModel ? { fallbackFrom: failedModel } : {}),
+          fallbackFrom: failedModel,
         });
         // The caller gave up: not a model failure, and another model would not help.
         if (error.kind === 'aborted') throw error;
@@ -163,7 +163,7 @@ export class CostRouter implements LLMProvider {
         latencyMs: r.latencyMs,
         simulated: r.response?.simulated ?? priceOf(this.o.pricing, model)?.simulated ?? false,
         cacheHit: r.cacheHit,
-        ...(r.fallbackFrom ? { fallbackFrom: r.fallbackFrom } : {}),
+        fallbackFrom: r.fallbackFrom,
         status: r.error ? 'error' : 'ok',
         ...(r.error ? { error: `${r.error.kind}: ${r.error.message}` } : {}),
       });

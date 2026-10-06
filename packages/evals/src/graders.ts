@@ -150,7 +150,7 @@ export async function gradeCase(
     graders: results,
     run: {
       state: run.state,
-      ...(run.error ? { error: run.error } : {}),
+      error: run.error,
       inputTokens: run.usage.inputTokens,
       outputTokens: run.usage.outputTokens,
       llmCalls: run.usage.llmCalls,

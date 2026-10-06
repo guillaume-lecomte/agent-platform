@@ -9,7 +9,7 @@ const signed = (n: number | undefined): string =>
 /** Human-readable summary, used in the terminal, in CI step summaries and in PR comments. */
 export function renderMarkdown(report: EvalReport, gate?: GateResult): string {
   const lines: string[] = [];
-  const verdict = gate ? (gate.passed ? '✅ passed' : '❌ blocked') : '';
+  const verdict = gate ? (gate.passed ? 'passed' : 'BLOCKED') : '';
   lines.push(`### Evals: \`${report.agent}@${report.version}\` ${verdict}`.trimEnd(), '');
   lines.push(
     `Suite \`${report.suite.name}\` v${report.suite.version}, ${report.suite.cases} cases, ` +
@@ -37,11 +37,11 @@ export function renderMarkdown(report: EvalReport, gate?: GateResult): string {
     );
     for (const c of gate.checks) {
       lines.push(
-        `| ${c.name} | ${pct(c.baseline)} | ${pct(c.current)} | ${signed(c.delta)} | ${pct(c.allowedDrop)} | ${c.ok ? '✅' : '❌'} |`,
+        `| ${c.name} | ${pct(c.baseline)} | ${pct(c.current)} | ${signed(c.delta)} | ${pct(c.allowedDrop)} | ${c.ok ? 'ok' : 'FAIL'} |`,
       );
     }
     lines.push('');
-    for (const w of gate.warnings) lines.push(`> ⚠️ ${w}`, '');
+    for (const w of gate.warnings) lines.push(`> Warning: ${w}`, '');
     if (gate.regressedCases.length > 0) {
       lines.push('<details><summary>Cases that regressed</summary>', '');
       for (const r of gate.regressedCases.slice(0, 25)) {

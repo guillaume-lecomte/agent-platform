@@ -2,7 +2,7 @@ import type { AgentTask, Approval, CostSummary, TaskStep } from './types.js';
 
 const BASE = '/api';
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,

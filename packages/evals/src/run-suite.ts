@@ -46,7 +46,7 @@ export async function runSuite(options: RunSuiteOptions): Promise<EvalReport> {
       simulated ||= run.simulated;
       results[i] = await gradeCase(testCase, run, {
         suite,
-        ...(options.judge ? { judge: options.judge } : {}),
+        judge: options.judge,
       });
     }
   };

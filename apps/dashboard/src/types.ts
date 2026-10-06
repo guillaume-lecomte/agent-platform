@@ -63,7 +63,7 @@ export interface TaskEvent {
   data?: Record<string, unknown>;
 }
 
-export interface ModelSummary {
+interface ModelSummary {
   model: string;
   calls: number;
   errors: number;

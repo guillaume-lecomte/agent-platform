@@ -31,8 +31,8 @@ export function createProvider(config: Config, options: CreateProviderOptions = 
       });
     case 'mock':
       return new MockProvider({
-        ...(options.mockResponder ? { responder: options.mockResponder } : {}),
-        ...(options.mockRecordingsDir ? { recordingsDir: options.mockRecordingsDir } : {}),
+        responder: options.mockResponder,
+        recordingsDir: options.mockRecordingsDir,
         ...(options.mockSimulatedLatency
           ? { simulatedLatencyMs: options.mockSimulatedLatency }
           : {}),

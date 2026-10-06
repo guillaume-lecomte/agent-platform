@@ -119,7 +119,7 @@ describe('baseline and markdown', () => {
   it('renders the verdict and flags simulated measurements', () => {
     const r = report(0.5, { bug: 0.5, question: 0.5 });
     const md = renderMarkdown(r, compareToBaseline(r, baseline, gate));
-    expect(md).toContain('❌ blocked');
+    expect(md).toContain('BLOCKED');
     expect(md).toContain('category:question');
     expect(md).toContain('test double');
   });

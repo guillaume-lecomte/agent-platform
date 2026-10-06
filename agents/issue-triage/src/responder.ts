@@ -1,20 +1,16 @@
 import type { MockReply, MockResponder, Message } from '@agent-platform/core';
 
 /**
- * A scripted stand-in for an LLM, used by the mock provider.
- *
- * IMPORTANT: this is a test double, not a measurement of any real model. It reads the
- * system prompt for specific instructions and behaves as a model that follows them would:
+ * Stand-in for an LLM in mock mode. It is a test double, not a measurement of any model: it reads the
+ * system prompt for a few instructions and behaves as a model that follows them would.
  *
  *   "Search for similar issues first"  -> searches before deciding
- *   the "P0: ... P3:" rubric           -> derives the priority from the issue; otherwise P2
+ *   the "P0: ... P3:" rubric           -> derives the priority from the issue, otherwise P2
  *   "ask for reproduction steps"       -> asks for missing information in bug comments
- *   "area labels"                      -> adds area:* labels
+ *   "area:" labels                     -> adds area labels
  *
- * It also models a capability gap between the two mock models: `mock-small` only reads the
- * title and the first 160 characters of the body; `mock-large` reads the whole issue. Scores obtained with it show that the pipeline
- * (agent -> evals -> gate) works; they say nothing about real model quality.
- * Use the real-provider workflow for that.
+ * `mock-small` only reads the title and the first 160 characters of the body; `mock-large` reads it all
+ * (see ADR 0007).
  */
 
 type Category = 'bug' | 'feature' | 'question' | 'duplicate';

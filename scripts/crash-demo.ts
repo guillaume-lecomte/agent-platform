@@ -1,11 +1,8 @@
 /**
- * Crash demo: kills a worker (SIGKILL) in the middle of an agent task and shows that another
- * worker resumes it from the last checkpoint, without re-running any finished step and
- * without executing an effectful tool twice.
+ * Kills a worker (SIGKILL) halfway through a task, starts another one, and checks in the database
+ * that the task resumed from its last step with no step replayed and no effect repeated.
  *
- * Needs PostgreSQL and Redis:   docker compose up -d postgres redis
- * Run:                          pnpm crash-demo
- * Exit code 0 means every claim was verified against the database.
+ * Needs PostgreSQL and Redis (docker compose up -d postgres redis). Exit code 0 means every check passed.
  */
 import { PgEffectLog, resolveIssueTriage } from '@agent-platform/agent-issue-triage';
 import { createDb, createLogger } from '@agent-platform/core';
@@ -88,7 +85,7 @@ await sleep(300); // let the subscription settle
 
 let ok = true;
 const check = (label: string, pass: boolean, detail = ''): void => {
-  say(`${pass ? '✔' : '✘'} ${label}${detail ? ` (${detail})` : ''}`);
+  say(`${pass ? 'ok  ' : 'FAIL'} ${label}${detail ? ` (${detail})` : ''}`);
   if (!pass) ok = false;
 };
 
@@ -130,7 +127,7 @@ for (;;) {
 }
 const stepsAtKill = await store.listSteps(task.id);
 say(`add_labels has been applied once; task has ${stepsAtKill.length} checkpointed steps`);
-say('💥 SIGKILL worker A (no chance to clean up)');
+say('SIGKILL worker A (no chance to clean up)');
 workerA.kill('SIGKILL');
 
 await sleep(500);
@@ -185,7 +182,7 @@ for (const s of steps) {
   const p = s.payload as { toolCalls?: Array<{ name: string }>; name?: string; outcome?: string };
   const what =
     s.kind === 'llm'
-      ? `model call → ${p.toolCalls?.length ? p.toolCalls.map((c) => c.name).join(', ') : 'final answer'}`
+      ? `model call, ${p.toolCalls?.length ? p.toolCalls.map((c) => c.name).join(', ') : 'final answer'}`
       : `tool ${p.name} (${p.outcome})`;
   console.log(`  ${String(s.seq).padStart(2)}  ${what}`);
 }

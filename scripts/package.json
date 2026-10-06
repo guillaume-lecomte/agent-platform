@@ -17,12 +17,10 @@
     "@agent-platform/cost-router": "workspace:*",
     "@agent-platform/durable-runner": "workspace:*",
     "@agent-platform/evals": "workspace:*",
-    "pg": "^8.23.1",
     "tsx": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/pg": "^8.15.0",
     "typescript": "catalog:"
   }
 }

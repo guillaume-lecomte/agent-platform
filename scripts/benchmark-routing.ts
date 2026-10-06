@@ -1,19 +1,15 @@
 /**
- * Routing benchmark: runs the issue-triage suite under three strategies and prints a comparison
- * of cost, latency and eval score.
+ * Runs the issue-triage suite under three strategies (always the large model, always the small one,
+ * the routing policy) and compares cost, latency and eval score. A fourth row repeats the routing
+ * run with a warm response cache.
  *
- *   always large   every call goes to the large model
- *   always small   every call goes to the small model
- *   routing        the policy in config/routing.yaml decides, call by call
+ *   pnpm benchmark                                 mock provider: deterministic, free
+ *   pnpm benchmark --out docs/benchmark-routing.md
+ *   LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=... ROUTER_POLICY=routing.anthropic.yaml \
+ *     pnpm benchmark --large claude-sonnet-5-5 --small claude-haiku-4-5-20251001
  *
- * Run:  pnpm benchmark                       (mock provider: deterministic, free)
- *       pnpm benchmark --out docs/benchmark-routing.md
- * With a real provider (costs money; numbers are then measured, not simulated):
- *       LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=... ROUTER_POLICY=routing.anthropic.yaml \
- *         pnpm benchmark --large claude-sonnet-5-5 --small claude-haiku-4-5-20251001
- *
- * In mock mode the table says so: costs use illustrative prices, latencies are simulated and the
- * score comes from a scripted model. It demonstrates the mechanism, not real-world savings.
+ * With the mock provider, costs use illustrative prices, latencies are simulated and the score
+ * comes from a scripted model; the output says so.
  */
 import { MockProvider, createProvider, loadConfig, readActiveFile } from '@agent-platform/core';
 import {
