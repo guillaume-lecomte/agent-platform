@@ -26,8 +26,8 @@
   },
   "dependencies": {
     "@agent-platform/core": "workspace:*",
-    "bullmq": "^6.3.11",
-    "drizzle-orm": "^0.45.3",
+    "bullmq": "^6.3.16",
+    "drizzle-orm": "^0.45.4",
     "ioredis": "^6.0.0",
     "pg": "^8.23.1"
   },
